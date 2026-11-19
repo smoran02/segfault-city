@@ -156,6 +156,12 @@ h1, h2, h3 { line-height: 1.15; margin: 0; }
 .clock.warn { display: inline-flex; align-items: center; gap: 5px; padding: 0.42em 0.55em; }
 .clock.warn i { width: 13px; height: 12px; display: block; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: rgba(138, 204, 228, 0.22); }
 .clock.warn i.hot { background: var(--citrus); }
+.sndbtn { display: inline-flex; align-items: center; color: var(--text); padding: 0.32em 0.5em; }
+.sndbtn svg { width: 20px; height: 18px; display: block; }
+.sndbtn .cut { display: none; }
+.sndbtn.off { color: var(--muted); }
+.sndbtn.off .wave { display: none; }
+.sndbtn.off .cut { display: block; }
 
 /* ---------- the stage: code on the left, the city on the right ---------- */
 .stage { display: grid; grid-template-columns: minmax(360px, 34vw) minmax(0, 1fr); min-height: 0; }
@@ -173,7 +179,13 @@ h1, h2, h3 { line-height: 1.15; margin: 0; }
   color: var(--text); font-weight: 700; font-size: 0.95rem;
 }
 .act.live { background: var(--orange); color: #00244E; border-color: var(--orange); }
-@media (pointer: fine) { .act { display: none; } }
+.boost {
+  position: absolute; right: 22px; bottom: 116px; z-index: 3;
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 1.5px solid var(--citrus); background: rgba(3, 16, 31, 0.7);
+  color: var(--citrus); font-weight: 700; font-size: 0.85rem; touch-action: none;
+}
+@media (pointer: fine) { .act, .boost { display: none; } }
 
 .doors { display: flex; gap: 12px; margin: 16px 0 16px; }
 .doors .grp { display: grid; gap: 4px; }
@@ -298,6 +310,15 @@ pre.out {
 .jobs li.done .pr { background: var(--orange); border-color: var(--orange); color: #00244E; }
 .jobs li.bonus.done .pr { background: var(--citrus); border-color: var(--citrus); }
 .keys p { margin: 0 0 0.35em; }
+.ask .tipline { color: var(--muted); font-size: 0.92rem; margin: 0.35em 0 0; }
+.answer-chip.tip { background: var(--citrus); }
+
+/* ---------- the Mod Shop ---------- */
+.shop-card { width: min(620px, 100%); }
+.shop-card .story b { color: var(--citrus); font-family: var(--mono); }
+.mods li { background: var(--surface-2); }
+.mods .lv { font-weight: 400; font-size: 0.85rem; color: var(--citrus); margin-left: 0.5em; white-space: nowrap; }
+.mods .btn { grid-row: 1 / span 2; grid-column: 2; min-width: 5.4em; font-family: var(--mono); }
 
 @media (max-width: 900px) {
   .stage { grid-template-columns: 1fr; grid-template-rows: minmax(0, 45%) minmax(0, 1fr); }
@@ -356,7 +377,10 @@ pre.out {
     <li><span><b>Take a mission</b> by driving to an orange ring and pressing <kbd>Space</kbd>. Any order works.</span></li>
     <li><span><b>Brains only.</b> No compilers, no AI. Trace it like the exam.</span></li>
     <li><span><b>Wrong pick:</b> a compiler warning. Three on one job is a segmentation fault and a 12-second restart.</span></li>
-    <li><span><b>Each job pays up to $300.</b> A clean job pays all of it. Hints unlock after a minute and cost $100.</span></li>
+    <li><span><b>Each job pays up to $300.</b> A wrong pick or a hint takes $100 off. A segfault takes $200 off. Hints unlock after a minute.</span></li>
+    <li><span><b>Every job ends with a delivery</b> across town. A fast drive that stays clear of traffic adds a tip of up to $100. A wrong pick or a hint on the job halves the tip.</span></li>
+    <li><span><b>Spend your cash at the Mod Shop</b> next to the fountain: engine, tires, nitro, a louder horn.</span></li>
+    <li><span><b>Sound is on.</b> <kbd>H</kbd> honks, and traffic gets out of your way. <kbd>M</kbd> mutes.</span></li>
     <li><span><b>Back from last class?</b> Your progress is saved on this device.</span></li>
   </ul>
   <div id="resume" class="resume" hidden>
@@ -383,16 +407,29 @@ pre.out {
   <header class="topbar">
     <span class="brand">Segfault City</span>
     <span class="team" id="bar-team"></span>
+    <button class="clock sndbtn" id="snd" type="button" aria-pressed="true" aria-label="Sound" title="Sound (M)"><svg viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7h3l4-4v12l-4-4H2z" fill="currentColor"/><path class="wave" d="M12.5 6a4 4 0 0 1 0 6M15 3.5a7.5 7.5 0 0 1 0 11"/><path class="cut" d="M13 6l5 6M18 6l-5 6"/></svg></button>
     <span class="clock warn" id="warns" title="Warnings on this job" aria-label="Warnings on this job"></span>
-    <span class="clock cash" id="bar-cash" aria-label="Cash earned">$0</span>
+    <span class="clock cash" id="bar-cash" aria-label="Cash to spend">$0</span>
     <span class="clock" id="clock" aria-label="Your time">0:00</span>
   </header>
   <div class="stage">
     <section class="panel" id="panel"></section>
     <div class="view" id="view">
       <canvas id="city" aria-label="The city. Arrow keys or W A S D to drive, Space to act."></canvas>
+      <button class="boost" id="boost" type="button" hidden>Nitro</button>
       <button class="act" id="act" type="button">Honk</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ the Mod Shop ============ -->
+<div id="shop" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="shop-title">
+  <div class="cleared-card shop-card">
+    <span class="kicker">Mod Shop</span>
+    <h2 id="shop-title">Upgrade your ride</h2>
+    <p class="story">You have <b id="shop-cash">$0</b> to spend. An upgrade stays on every vehicle you drive.</p>
+    <ul class="jobs mods" id="mods"></ul>
+    <button class="btn" type="button" id="shop-close">Back to the street</button>
   </div>
 </div>
 
@@ -508,7 +545,7 @@ function unseal(hex, key) {
 
 
 const MISSIONS = [{"id":"garage","name":"The Garage","topic":"Inheritance and overriding","block":[0,0],"pitch":"Every vehicle in this garage is a Vehicle. Pick the right one for each job."},{"id":"courier","name":"Pointer Courier","topic":"Pointers","block":[1,0],"pitch":"Every house on this street is a variable. A pointer is a house with an address in its mailbox."},{"id":"impound","name":"Heap Impound","topic":"new, delete, and shared_ptr","block":[2,0],"pitch":"Every car in this lot was made with new. Tow the ones the code frees, and find the ones it forgot."},{"id":"shop","name":"Body Shop","topic":"Pass by value and by reference","block":[0,1],"bonus":true,"pitch":"Hand your car to a function and predict what color it comes back."}];
-const LEVELS = [{"id":"g1","mission":"garage","title":"The couch run","ticket":"A couch has to get to the pier. The job is the `main` below, and one class name is missing. Take the vehicle whose class makes it compile.","code":"class Vehicle {\n public:\n  void Drive();\n  void Honk();\n};\nclass Truck : public Vehicle {\n public:\n  void Haul();\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  ____ ride;\n  ride.Drive();\n  ride.Haul();\n}","ids":["ride","Drive","Honk","Haul","Wheelie"],"hint":"Find the class that has `Haul()`. Then check that the same class can also `Drive()`: a derived class has everything its base class has.","scene":{"spots":[{"id":"sedan","kind":"vehicle","type":"sedan","label":"Vehicle"},{"id":"truck","kind":"vehicle","type":"truck","label":"Truck"},{"id":"moto","kind":"vehicle","type":"moto","label":"Motorcycle"}]},"steps":[{"line":[16,18],"ask":"Which class goes in the blank on line 16? Park behind that vehicle and take it.","options":["sedan","truck","moto"],"sealed":{"sedan":"6d0dfbd8c0de41224089bd90e33384f04abbc7dfb013dece9f0783fe4a780e5049eaed0144010c80395d02456e7b5e41ff9d15f1b9d5e0f31920007df7cb39bb04fe9c5dd06eb1f9964e1c975abc98460ee137c39c94544087b8e92f3d8d1c5030713ac1b41c7c9a14029bcdb0290327ada85b72a49b929b337cc556fac4641344b4031bec3663abb92c579f69ac502100f60b38650ba1971e346487032ac0a54f593d9a876be1f3abf84d427bb3a1c520a5fdfeaff88b87601591d623f66bb600db718e3f36082e2101d5aa","truck":"12fe7da9bf514b7c670dc71b0cc27c87dc45d81e1c176e82477c543c095256d100dddf6ed2742c29d46d5ba70cf65602d8207079f5dfd57717b6b29cbbe15a71322ba494b9a88928cd827326c1f833ba1285cf66deeed5741d8e9ecd9c8b3be9d9e671fcc7cbd65ec06781068421180744c09c882245ec9f942f15f444f130c60a340421c3f5b0c3142e93fd120d4080f545a1db638459ec8c42ff9457ad461ebd845d3eb7776574ec24682e188b57","moto":"f44d64c8b7bef468588f352971b165608135831ee93c92817e01de1ccb4a751fa3e0ecf08926c711bb988b3eb0a0e6cec673b18f7bdf41f47dc25eb3c287099ff76bc659da5f5dc27620cc3b104c468fa605fdb659e8649e7b64aac1c4932fa7d905666823719c32dee864b3dc9c47423d22eb3bb9a750d1a60705b60301005c1523963801e4e10ba4b2282c787a19c0f403da61b8e444bf9c9c91b39413960719eb7e2c02ad306161d55795f810df49f48bddc1bf56fee510cac180570a4d2a613ce9df33a9edb36d45a9ad14961d5aa43cff3236d4a0aa64b005535f92c43296d0a29c1a205845bb2ffbd0f6409d88f3f642858ffb69035b5af7f4d25e0d97f50a69155748e1"}}],"leg":{"to":"pier","say":"The couch is loaded. Drive the truck to the end of the pier."},"sealed":"93b08df8dea2df8d5d101e623bbbd149d1e9fc6f977616ce3243644ead50e48ff7cf363be6bb2d298726e1e6519ef332c326e096f8521eb00b4f438e59efedcea346ea9c498990b87d284872696ff0ea42b9e16dc73971ee4fcc7e62795ba75ce056b82d93e0d1e9c6976aa7bb24b7310f1c6e9bc6e4acf2080f51a47f07104d9e13456d20033fab85c7bfba44c83dab5a0513063c232b8d3b39f1296182003d29e6716f118c38cf30d0d3922234e0c84124d70dc17c3c233849ea318f6386015b3678f358f26ff83f317c673036615966c4f4"},{"id":"g2","mission":"garage","title":"Halftime show","ticket":"The crowd at main() Plaza wants a honk and a wheelie. Same garage, new `main`.","code":"class Vehicle {\n public:\n  void Drive();\n  void Honk();\n};\nclass Truck : public Vehicle {\n public:\n  void Haul();\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  ____ ride;\n  ride.Honk();\n  ride.Wheelie();\n}","ids":["ride","Drive","Honk","Haul","Wheelie"],"hint":"Only one class has `Wheelie()`. `Honk()` is not written inside that class, so ask where it could come from.","scene":{"spots":[{"id":"sedan","kind":"vehicle","type":"sedan","label":"Vehicle"},{"id":"truck","kind":"vehicle","type":"truck","label":"Truck"},{"id":"moto","kind":"vehicle","type":"moto","label":"Motorcycle"}]},"steps":[{"line":[16,18],"ask":"Which class goes in the blank on line 16? Park behind that vehicle and take it.","options":["sedan","truck","moto"],"sealed":{"sedan":"c993741a2e884966c7b7e3e551e96249b0d8b32c51c4907e1daa9098900040d4d6fe95748a752ab4c0b6ad232bfb56fae9fc3546c224751943605d5fc7db1b22975dac6710ba0ba09ce7cf5703cd243e289380565d8b3af4ad242421fe7d896a488bd19c7990ec9385be5c2b05b4a7e4e5a6d308ebfafa0daa8f97e930d6a9219362140b1bb21d02100e83169fec3f540f7cb39dd18afb04db0fa04f7318001c8e2913904ef3995f4f797e45ac67e245e5e553","truck":"73f1ae061e7e19b3ee4a85eed63d2ce5e2186e8f95a5e2dc44c1d34b3ddedfc7b18bd730de9a6f214072b61a16914c4468276c3273de0ec4335b4a7efb551cff3941f5afb90e5d0c0ba3c95e6b025f1f0530eb242625c72d5d8640515a1dd2178610b71fd3ac6eab33fc2ac079834db23e680f715946acaa37b274d7e3a68f9b9886d1e2823d4ded97290eded7b63f7a08c94063c7c9e6cc49c30be2f113994339fc33164b6e736862a6ef3d905ead93aba37171d6fd","moto":"5e2eed4b08631aeadb0f60a1fa7d76b602d74e89174864bd1328caa8d913edc9321e7e1391bb551acd93fc0c1c38930e74c58b97294ec1e5381a43c3885af811121a314b38604f4965608fc8605a1337a6d7b2e9dccdd4aba9feacc6c58cbee1ade696e2bed0de3fedc90f83328c723ed97a1b3a948c60ba939afb5f81a9b599cdc09d9d27045a0d054c8af998fe84e2eb51897edb4272616c2df6151e85bbca4b78fd1be24bc30397e01f13572022c61c445acd42b80b90f2a4e7c48cc560175515daafc9ecf1a7e84bd1d1c4cda12877bedbf55203c54ecee80c6b4a9ecd2914447ce6089e929d1378"}}],"leg":{"to":"plaza","say":"Ride the motorcycle to the fountain in main() Plaza."},"sealed":"9e560632cf5dd7ba1e7546ef8fb0dc395e2824e551bc5e060b2377dcab21658cdaed93a488db612582cd7ff46242b7b7acf9e64c0a52cdc44a6f375f7d5fe6a3cdeab0d99e6773062f7a246b4ee2050d611ea5c5c7b7c3f4a474becdefd6df55f3b285741a28f840e3776405a12bca0b3c05d984ff6bb6ba592c976a2deb11e79163a12cde92dc3f94a858cdb3d99892d661f96ff7c9a8db5ee096e3e235b497994c66ef910983d7b3f13c9a63487cc709de3d51a8f63e2072e024a8"},{"id":"g3","mission":"garage","title":"Two horns","ticket":"Truck now has a `Honk()` of its own on line 7. The billboards show what a line might print. Park under the right one.","code":"class Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"Beep!\"; }\n};\nclass Truck : public Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"HOOONK!\"; }\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  Truck t;\n  Motorcycle m;\n  t.Honk();\n  m.Honk();\n}","ids":["t","m","Honk","Wheelie"],"hint":"Look at the class of the object in front of the dot. If that class wrote its own `Honk()`, that one runs. If it did not, the inherited one runs.","scene":{"decor":[{"kind":"vehicle","type":"truck","color":"citrus","label":"t"},{"kind":"vehicle","type":"moto","color":"white","label":"m"}],"spots":[{"id":"s1","kind":"sign","text":"Beep!"},{"id":"s2","kind":"sign","text":"HOOONK!"},{"id":"s3","kind":"sign","text":"Beep!HOOONK!"},{"id":"s4","kind":"sign","text":"Does not\ncompile"}]},"steps":[{"line":17,"ask":"What does line 17 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"75b839e255c14d59664fad59219135d1b1674149921159b042252d7c7b2639c96a136fb761dc4c5838c2504cf15b8a8bfde72951a890c2346ee1e6a517b66fc491cecafb4f3ea7571a8739a4a0d5caff369219c150826566fba46c304f6287c521b54094a9aeec0aa71086c07a759787913a516c77776117576a64ad771ca3","s2":"160bab9c76b8a7ef6a17a20c73a7c97a2e8acf06b96afabd3395b4e0e2431375ce1c12e81413b37a25ab75db2c2d25c6533a5d402f34c96d9d21010eaaa898284169d6795c91077781ddf9396a65","s3":"30b2707354f3ec711164d37a5e0c7fbfc28171bda6e58d98bd95ab94bafcc2494a50f4b3885954b82416c5f7b9f2775860d0311c8e49d0a74d43e2dae64bc636da9553f8d842752a13ab2d167663109db70d8a7e86275bd2931af245fac2858f1858bc7665660840d6e7aa1a1527bcb6545dc0907f5a16606470f01f1db6884c0177df260276c24ee571504d8f0849d74245","s4":"bf3a74a978a079af567110656181debb165eb36f3d37e453ae7acb1d6b984422910c71f2024a68bcf0a43472759ae9e6017e886bf01195c83baee0e049a331f6755ad6618b0870b026416b2a520b9695b6ec4eed0e12869c2a9e83cd6dce16e93edf3df5f6e40d7109fca9fd2d08c190399169310d1bc964716243d0a7f93c11c1cbf2"}},{"line":18,"ask":"Now line 18. What does it print?","options":["s1","s2","s3","s4"],"sealed":{"s1":"1777210e50029d9d8b39077c7da5f575c07eab878c627087879509152515f8a12b05d0544c52155537a0d8b1f775e272de819623f4ceae23a8bb6332730b65bde0cddd8468232db2ae03f171567a8cf461d5df9961822821d44cd550fe6860322ec5","s2":"ab17bbffc15e08adab5b6cf77fffb21806624fda1e40ba4725b48597c73a91c53be6e36606f720da84fcbd331ed6cccbc40c8866121d7ca4e356e03444f67ee61bcecca101d9131ee4dd11ebbee2f77aef7aa10a0e801f667ad6de9253d3d830c6109550ac62f01e33d10bc6dac6e7ae49ec7e378a3c71f4a0cd1f4d5f70d66c1797f4ffa783","s3":"5de14eb0b1c552a3a726d6de962b4c3d91ae62d352429ae1d6c00da932e377bc5233549bc392428f6e0fe4163acaa7959cf91d2b6e6277a55d256c7c93da2dc78468285b917f185368521d72f63fff1e43acada21a7cd0fceaef","s4":"b6443032f3f341395fc0d3cd89d403ab1c60331eec0c17159652e46484fcea27c9997f17b2c7751ebd54d89daa6f02564222281b64f77cfa04c0c8c3e7074cd07d649ad985929fb85810c0f8dbe469d83453910efe363acc3678cc7d5ca9caf2f106aeca95d8ddca67bef257e47f867c790899f5"}}],"sealed":"8d1a6846f1ea6fdd4c04c757d88cc2fcda31eafdd107f1836d005fa6e7cda14c8a5cc0e09968db5aad4dd73de563576d21d64b30527c669f52f53df900517ad38ca397b38d9ef96647f1e9c4398dbb7695598a3943a3ff2fd00f7a4c75926c8ad1eb4ac4cbb81a9952cbec636506a8d2c60ca29756a383c6b9d6e8388f9ce86f6ec59fd041407198700db8ba947d6d82c861206a0d80afac224e02c5b70312ae5fc5c8d922a7512dff1d5971b50967b6700c8fbe90ad2b242af24daddba4a834d38aa9c6c4b2e2a2e4a6590d55dc413f0548e328f28ea630f2e27554b256c1bb1a22878fa0b96bfa88d82bce0c1b9a55"},{"id":"g4","mission":"garage","title":"The 121 bus","ticket":"A Bus should honk like any Vehicle and then warn about the doors. Line 8 asks the Vehicle version to run first.","code":"class Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"Beep!\\n\"; }\n};\nclass Bus : public Vehicle {\n public:\n  void Honk() {\n    Vehicle::Honk();\n    std::cout \u003c\u003c \"Doors closing\\n\";\n  }\n};\n\nint main() {\n  Bus b;\n  b.Honk();\n}","ids":["b","Honk"],"hint":"Run `Bus::Honk()` top to bottom. Line 8 is a call: finish it before going on to line 9.","scene":{"decor":[{"kind":"vehicle","type":"bus","color":"cal","label":"b"}],"spots":[{"id":"s1","kind":"sign","text":"Doors closing"},{"id":"s2","kind":"sign","text":"Beep!\nDoors closing"},{"id":"s3","kind":"sign","text":"Doors closing\nBeep!"},{"id":"s4","kind":"sign","text":"It never\nstops"}]},"steps":[{"line":15,"ask":"What does line 15 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"2923cf2f9a19be3bb77856011463f10e960d60adb36a004bdc206b47792a1097c814dfdfca8faf14332277bc7396ed5796d4aa3d75add2e8a569cbd875a4e11c72478ec6bafa9aace4945f18bc91c3c356f8124ead0b8f4b563681c564bb7875ee392b8ac5d5fc658cb0977db616c8f315670a049b30584c29bf246357f75117870df6a0f1acb2c334bc80","s2":"38f25653b0550b8f4982d5873af4df1aa4b75fec650f4397edb1f3a7c3c7c6c4e65358f5b8c19540f4cce4f5a802cd05f6a58f33b46f16bd74e92483ebf5ebe5bb01420ad1e1864e17e812f4ced0a6efcd656b57160ad2e1422789c784cea738ed0dfe37ca","s3":"bcfbdd183c758b1c4f3584df2f47bc54f70380e95b1fc54de479daa87e975aa20d1adb5bbb3d9df56b1487336b02395d1db90d2e4caa662ae371ce41f227ece00096e6950fb9dd9e0d1eec24169719afc38e148b931f1869b694ed81ed46e8ed644e","s4":"c537caba8cf89ff133c14758ddc4efbaf84ed8b3fc0a5ad5740bdaf0d47236f890045f26163b65f786a292c36643117a7c621a5bbdea18579465f5e12f8a7c76026a2b653690536067f74f3d131370b747acffd687b98c135195f9b1513ad751967c9b1aa5e081ffb29b38009c0503e35ddcfa33a7a3c39830122c"}},{"line":8,"ask":"Now delete `Vehicle::` from line 8, so it reads `Honk();`. What does line 15 do?","options":["s1","s2","s3","s4"],"sealed":{"s1":"60974777205f0923499c574aed47220654b42523305cbd4db7876def37fa7017e7ee7e4689dc467e832984905151e1dbbf0b7133ced9a18b77dfef798af514d0199c0890453f26e39dc1653171d5ef56c1ba30a2cffa50957451f16712bc3236a4749f6372195c368c","s2":"0823080db895bc7c5055d3f6ea10deb9f4671630c7e0699702d52aba206515ed784fb5044923f76915f7707b747305036e02544646f04243dcaf24f92ce80e6de1f60adc9ae4be1fd39729c4a80efcfe6e6f85ae9827c30b03b2f6b19fe77598ead814b9995b15a12e010d73ec85b188c3335a45cba654cdfe0d","s3":"2fbf7422570fe1dabc6a1c5901452591f3fb748f50b60cbd0f5639faa94f32717ed7be4b4c2d3dd88b5e88060d66916518ca269695a4c2a6871d92a6c8a0934ebdb86e90240794f4bea9a4d43f25f46bf074a3bc0411e94aa37f047112bcd1244bdf8d2faea9ba501809d0e114a345cff091d2","s4":"4e4a1cef1443b40c06caf2fc266ea2910f9498aa2fc357e1f744dd912096ba2c32929df88314aa71ea9283ca7334b03da93b43a361aa7acd1d6ea7b6499d593a9e6d4139e674d6e338bd06e57ead6e1a923f1c00e0430fc419ed192f7e1d854d2b2015828fc72bade4aaeaeadc2f616ee28595d7f7dcd65faa8cd226745c8011976a322d29bb114b604eb79faa1298ccd67e9de7a1ff265b4f0ff5f260063c52affe54950cc5ea29ea7cb6e1659a3878f38857b4cfc58fc9dc934056ac74da32e19f55846584e42022160e6006890bb558fc54380697ed12f1f2f2d5eb0a7e71b5c1507ac1539cf377bb59c52f7447a33b6276e1637a93e2f3caf73800b48b2a92a2f570866efa14d045978a5bc0b55049f23efe51"}}],"sealed":"22948fca2e37013fd7372056fcdad17c1a8ce09d85521060bdc277ab0971e9a7ef583e8b9a829e09656b7db8dbfd4babfcb6a48e88cb9b01732c49b0e039470b65777f9fa2b8ab8f5bd9cbd795d7da92cb1c1a0ccfbf5108fb2491134894bc89175ef63f4e0c3159528d6839a07e74bfee36a604492a156e74b4a9b655dc26aeab3f61b48d78af276b8a50a5184a229b08878c1307e6edd039d39163c6589ce56ac505acc21b7fa3dc9977560a0108ed38f7ab63ede7715f4fa958325cb4a43495de04ca342f91e6b8a60f2226"},{"id":"g5","mission":"garage","title":"Fresh off the line","ticket":"A new Truck rolls out with a license plate. Both constructors print a line.","code":"class Vehicle {\n public:\n  Vehicle(const std::string& plate)\n      : plate_{plate} {\n    std::cout \u003c\u003c \"Vehicle \" \u003c\u003c plate_ \u003c\u003c \"\\n\";\n  }\n private:\n  std::string plate_;\n};\nclass Truck : public Vehicle {\n public:\n  Truck(const std::string& plate)\n      : Vehicle{plate}, load_{0} {\n    std::cout \u003c\u003c \"Truck ready\\n\";\n  }\n private:\n  int load_;\n};\n\nint main() {\n  Truck t{\"7TTN121\"};\n}","ids":["t","plate","plate_","load_"],"hint":"A Truck has a Vehicle part inside it. Ask which part has to exist before the other can be finished, and look at line 13.","scene":{"decor":[{"kind":"vehicle","type":"truck","color":"citrus","label":"t"}],"spots":[{"id":"s1","kind":"sign","text":"Truck ready\nVehicle 7TTN121"},{"id":"s2","kind":"sign","text":"Vehicle 7TTN121\nTruck ready"},{"id":"s3","kind":"sign","text":"Truck ready"},{"id":"s4","kind":"sign","text":"Does not\ncompile"}]},"steps":[{"line":21,"ask":"What does line 21 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"372dec94266edb28e5f344d4184bcd88bd9130df6c50f141ef0c0ab5dc52eaf7f19ffc4f46c1420c34dc2375b4b1726a6ac184fffede9cc09c4a93cc3fe1c1c8be59e25279b9126c09cc9a89b0659cbb8377fc6e641b66a030a2194b1a3b753ee7f9d4da49c952cce598a454a52f0e763b6156b9993c5bb3f132eafff27deaec96b806d1580d6c4b6a900f1054e697917b","s2":"4eaf505d0e5fb2729e379c1df6125c577a1f4bdb92495e8d8ec9994bb0ffdd2d51548e44d03bc44d32acf2b069287fa9447758dad38342f625ba7b9172d6857989bb71fcf42f","s3":"73ad992a5202c6798ebd8df34515af3c8ea4f12cfe851efd7084023d806387c0288d411a4cbcb8ec40ee3367a081355dc94a8db3802a2aeca170e3521bce385acfbfb705f3d320e5d95f4e639b0badec1d5d83306f33f45ef1b1a069b8706c915a63823a9039f1bfe807700fecef1a2d234fec37aa68e0cab392b60fb80251e4021e242553343ac245dc","s4":"cb3893f46ae3d8172aabebcbbe9eb309b267658d125dfb0388732407ca894fa72e24107ad51ab26b86a82900281ea3ba198152a1a68ea2f17abee24d789c9f18c95a8dd481faf9ff76bb2b3a01bc0ae171ca0cc6971b24250a2831634c031c47e29cbbaa761f795c902ac7700b7c6f7b5685ebc47d10b0b323443ea8b1a6cc"}},{"line":13,"ask":"Now delete `Vehicle{plate}, ` from line 13, leaving `: load_{0} {`. What happens?","options":["s1","s2","s3","s4"],"sealed":{"s1":"00283432bb17fa021be16c7dfda34bb3751dace4c124b7d340f5d5a88c3abc886dd6c52471939eaae2742bfbe27ae13e046aac6b8ee1489eb5ddbc3639037637edad07e23cfde39ae9412b5b6d5506fa6e05c1c20b2c2424ec646bc145724174f7ce0dc7b0ee802d70462bd8ccd5c50b3184a6d411738f4f17cb33a934","s2":"6c041f2aa416874241d20e8a17ad7e203ea86902dcb116c6f833e5941f0df6f2c9961a92ef0ac71758ae6958bb5282401f4aaa2f573d31dff29366d0e199e59bf7fd11581cf163c983da58385a0c8af0fd9831921fcfc3a81006cbb4de0778c0b5f2a8088c843ef8dc1d39ffd38b067452e659cf7f14","s3":"a2f47a7b1ea5a905a9055f1b59e800f8898a79612e652b653345e37f3dba60b925c9ef983dd631bb2b89e5aa4bd84a6949b18c594f5f2ef1fabbb484aefaefc8fe6c9a04a51bf6e184e30aaeb4e2c85fb3de2960bbf834f65c276331631e843d9b69182673c5e342b55a846e578c11483b6d1e28580819f9a30ae00726214c2be500b72ba3","s4":"5b9450ca985da2915018845ab7f5db7ec2d1e257b1e91925982c8ecbd0379fbd97c578d2f6c3a2f6c65d786e4a9298cc5e92527cc94c170e801c32107c56a72c5bc84ac4ded77f5c30a6b842c150292d62a2a7e59384fe612778680da82d2e02b6fdda122b78f4f61153607f682f0ac4df9eb9759cc2c9968f4dbe10c41d530a87aedbeee458e1147cd69e985c915c634cb033e92003d93c082f0658f7eb85d420da73c66cb4c4e2fcd451e8ad2d7c7f2a0e0f3ff079bfbc8ba25da9f18ce38a64ac1fe6f84288adc678f27b8c958b77213750c0b5b70822ec7db125087fe1d11584a377d503d798888912503aadbf4ec1eb062c4b3558afd339d1e904a2cf49d20aafc0cb87914008be7deeaf8b3c85ba43f9cd09"}}],"sealed":"9a830a1adb79c9fa37f6413228b55d14bd31aecee483ddc887013d50e399903755dd8a521946fd07cda5d6f32317b4109a4d7a59fd6acaa1a2b15e4cea6fb8a9c7cb48d1d8c6495670883651cfb2290a07db59d155f28dddcac84653c539fb5f0fc22d247753491661dbb27dd21e4f09ac329c6c443175e691bdc64904e7f837bf818d8b638a8f779113e908ed8ba9922e671957eb2f43eca958fcc4c434410847c069163baa9940aae56e874ab50c5d291b2a4cfd94a65cbc31bd4325af8914b9e783d274525bc1d10b43a953e730f21774aecf5fbd2038"},{"id":"p1","mission":"courier","title":"First delivery","ticket":"Each house is a variable: its plate is the address, its mailbox is the value. Line 4 delivers a 99.","code":"int a = 12;\nint b = 40;\nint* p = &b;\n*p = 99;","ids":["a","b","p"],"hint":"Line 3 puts an address in `p`. Whose address? Line 4 follows that address.","scene":{"spots":[{"id":"a","kind":"house","name":"a","addr":"0x10","value":"12"},{"id":"b","kind":"house","name":"b","addr":"0x14","value":"40"},{"id":"p","kind":"house","name":"p","addr":"0x18","value":"?","ptr":true}]},"steps":[{"line":4,"ask":"Line 4 runs. Which mailbox gets the 99? Park at that house and drop it off.","options":["a","b","p"],"sealed":{"a":"20486e1b0d1b898af490758e3d2562b712a2f1d960d64879fd1ec60b236ac20783e8c4b97e8368b64da8c28eadf07cb29e0045b0278478ee6b8e1921d330e2f5ee32bf21b408dc3614d0456e6a8424a21878884743880cebd72dffe8312ba9041033221524c77508237fff436f7861b823906492f0d79bfe596f459bdf0cc4e25813cb53761dd9db12f13e","b":"17ab1745351638d6c5ad48cb0b73da7e56113374fb553ca9d9b3f37dfbeee82ffd09923b13c0e3f6457a7ca6488ec1056c0646fd632ebc641a61b02cf8d28729e1488efb2f4ae3c40a974a0e53ee9635efad72321a0d4c879cc83e796761663e8aba282be086e2d9653495578e680a9d59db0d2a531469f62a75680e5372de5cb391abea2a84c70150811166d13623cd32e9d96da9cd4856b8dce9d4d7201ac3bda456","p":"b390e380a73b8c4d6595ebd07fa35892ce5b7aab46168b199e93f63e1fcf313feb4146df0e81fefdcd48bc327c1a772f1b2ac65e119d502860f15d68eae69a03fbc2c42b514fc959c04a9f2e0659486461ca6fbd166be96dc3c04a8e304fd3791ec6905af06f3e826dc988644d49717a62f733b03e8faab5297b2d730e0ed7da5c5f3d0d802f4a77b033dfae91225893f59415cc22483503a46c7827dd712ef7c8e1b8ac6d5200dd2d62853338557b6527c9c5c40b14eb5371"}}],"sealed":"74ab29b0ef5aebf2addca59e3e6d93d85e5b465517fc760505d8a69d46dc5644d3ad4c5355f454c0dc571e4a783f3fbd549fb636c2e87785fff25ab4c748cbdc408c2850b59c2c188a2e5914ece322ff832f97140263b85c7732daca9ad879aa4e01575a935a95cd66869c7bd234e9dbe995e17db44824bd6b5db7717e401f2e3b5d8dcc9a7714961b7e50429cf4cdd627528ef04d76095958d33ad6e19bd30bd7ff2dd7f54862566b1ded5a1da879f43bd146135ee3"},{"id":"p2","mission":"courier","title":"Change of address","ticket":"Two deliveries this time, and the pointer moves between them.","code":"int a = 5;\nint b = 7;\nint* p = &a;\n*p = 20;\np = &b;\n*p = *p + 1;","ids":["a","b","p"],"hint":"Before each delivery, ask what address is in `p` right now. Only lines that start with `p =` change it.","scene":{"spots":[{"id":"a","kind":"house","name":"a","addr":"0x10","value":"5"},{"id":"b","kind":"house","name":"b","addr":"0x14","value":"7"},{"id":"p","kind":"house","name":"p","addr":"0x18","value":"?","ptr":true}]},"steps":[{"line":4,"ask":"Line 4 runs. Which mailbox gets the 20?","options":["a","b","p"],"sealed":{"a":"64b39f9afeff5974ebe5a135b094176101c39649bcd151e213007f26fad2426286291881e8b3a795f7625f51acd47b7f94820c80c1ecadcbdb77b7d09c0031d3ec03a9a2665772a7b06aa9bf8630ee647fe68b87317adddaca897dfa2adea7e54e2f75e31f397b5065b3204da3404462bd5ed75f2fc416ffcaebfd","b":"1fdb4e097b2e0f9cd326ae8e759bcacf5041d073b3aac696d07bb4dcbcf186a94547a85c1008f533107aa677ca2b9a706ef6f28353fd2214cb60f8590319001db067cdad83ae158bc19309ed6e3285fa3077d129547ab4cfb0ec6c73","p":"a7b3efcdb012b00dd7904230f74d954d744b5993a79ebc234a1e3ec5370e6929b2865ace3146128e57cb660df50cce38eb65e8a3e67da67688a9add016eb30080efa262877cf737576eae75312682c791a82f8b5044662a54c385b45a92bcdc0b34acbb52d2c4d8c17f4ffab718b01ceb9d5dab2e6ecd8bcc57b13018d89f0ceee8159982e3e1276cb4c3195e425d6fcbe90503880fdf9075079ed56d190c6217cdacde207d0f232056bf5f58906241aafa7fa2d90749a1352"}},{"line":6,"ask":"Lines 5 and 6 run. Which mailbox changes on line 6?","options":["a","b","p"],"sealed":{"a":"6314482749b0f1ceef5756bd22df0b89d4bf995d042c034ee2a0247db0af33ba1626c4ae28785a9e3ee04002c04332cc8cd52f3317de1b70105a845d0ccedd64fd796c5b7052f9c37939f384082f4c60d19380cf9b2b77","b":"df15682beb484750d28bde94503598eb9aa479e5acf04c6c0ded1a081f5a29f7fd6b3d095963c16ce7271df3af9369e8d64c78c2d3aa8a74b4db8686e3b17ce642307f3b4f850ef6048c54a86231304887a534eb76aa4e0f2b1e5b709201fc4b1a056c16e640fc4ddec74ca27a494691fbafbaf0937abe41b8c60f03fec477e64eb0aee4696a65c373c9cb12f94cdec5081de6d14ca3a6197dea5b32e249b7b426e6d1cff3","p":"a2cc8765416942a8e27fead7a96132d9a1181543a682b5505f9659f640a0afdcf345af21894b812b7e045153622733524af3f91aa5a583044a969ab7bc08462ea9b4e2a808419f46cc11d5a6534cc1148d75ce8947d8394c48026cb01055b40f31db78b6a0dd799caeb69408ab35750aa4f40549f58cea4b8c47bccd9626d2e44f1159d62817bfc1925d49f94ae78304a4c384901b6428c27ef532b9754391f82f90e6ccb1e142e04e98d1f7bb229bf56cbae685ffe27e24c3"}}],"sealed":"9f27ce766866483385886cd847c355b93458a51caf6a4ccab977dbd0eba5ec90d4fe34afa5036bb185a4c599f42f1bae378eb76c5094fa1c26c3457a292e23c817041e9dd5a3b7868c03533dc56a0b838f66343229611cc622547bccdc9435d5ae8515b5476ef7a0fd2310f4669a496313ec99bb25402443a59deb2e1c59038afae201c253833aa6e847bdc02357f395bfca46b74b890133916f175557d3e312ac6698ae15dc"},{"id":"p3","mission":"courier","title":"Two notes, one house","ticket":"Two pointers now. Line 4 copies one into the other.","code":"int tips = 10;\nint rent = 50;\nint* p = &tips;\nint* q = p;\n*q = *q + 5;\nq = &rent;\n*p = 0;","ids":["tips","rent","p","q"],"hint":"Line 4 copies what is in p's mailbox into q's mailbox. After that they are two separate mailboxes that happen to hold the same address.","scene":{"spots":[{"id":"tips","kind":"house","name":"tips","addr":"0x20","value":"10"},{"id":"rent","kind":"house","name":"rent","addr":"0x24","value":"50"},{"id":"p","kind":"house","name":"p","addr":"0x28","value":"?","ptr":true},{"id":"q","kind":"house","name":"q","addr":"0x30","value":"?","ptr":true}]},"steps":[{"line":5,"ask":"Line 5 runs. Which mailbox changes?","options":["tips","rent","p","q"],"sealed":{"tips":"5e17fe303b4be901f528753240b53b023d2f6d14eb33b1be2b82c178ae157543a9d860799f07fbb000a373eb826ee38885115f9400195de96b8eee12585d54d7e58ecfd47411c1843f85ceaf930742992e5555c6c2654592123e434da8824751cd4204acbe4b6dad4f1ed153231bd0c494677e5941a6b0e43bd4d434bf27514b6f585612898f96aba6f5e4d37dde3eaaf46b3a446ffe023eb7f4de96b9fb62073b280787ef8d4e0d3dca2c338dc20c1c86ad556be8f752214525d74b617121","rent":"d6da7e63c85c3b64ed54605ef5c89fd7393ed280069b79fc48f203430318d079313c4347d8e3eba6ad92ae30961946e680b1561a812f20dd091683155ffc302440ab0e41056a95171befb9fe5750985a7d5fbe136348e47b30d6658b2da1638ec9dccebd20f85ac95ab11ff70d0fe3456532d81dd4a6d240b8fdfdfd611e20bb6d2de0f0be3a","p":"898f5fe80ab734abc5454f4840127cb901c369b6bdc459779841900f73253e819fad22d347c53cfca1e7fcecf9114c725fade4b52302f1a2c957238284108bd6ee6211d477eec4387e2df081eeda2e8e9001275792cdf3295e03ea46c06047f7e6ac14463de336d24c324bec8f2e556206a5cff1b9eb95ead49977bb6d72f689b80d442087b41ca37faa94133beae24690","q":"c7dd61fec1439b9ccac74b04663a7e4bfee296230e783ef8ba18034905790ea52ab0ba31dcefd7332215d4767ec38f861d1dbeb3f34ccb3e688bd5260e38c54669863d5f20629bc359b948a199938a2d5891b80f39238b928f3b847fb358b63709b80a31c74b6b2e06bfc5f1162282dd9aa7f40818d8fc0df27e3d0aa254918df6df86b76946cf193feaf40946cffbf9db15fdccbe073801e3ae1750fd1758dd3eebdcbdc28dae137275b96c7e29f9a37f4120250ba05911f8"}},{"line":7,"ask":"Lines 6 and 7 run. Which mailbox gets the 0?","options":["tips","rent","p","q"],"sealed":{"tips":"00e5d785fadf8b6a7242ce23a8b1ca226ffda627b1bf5105bda61ebf1c90945edfc217fa18f45dea2e1283138151c777cfd408f11ae07f2d8c6661fed2b99420a304b7180410997d9fe0c6c534621be4973d528f23ae9cc80a7cd9aece793041280919caf24988ef43a47dd8b7b09b4ef2b5d9b8d0c1c9169fb74c81eb2ff97ae9f1aa1f45ef8e50037f45a998e6bd84bdebcaea2130d8d93ffa049c654888cfe83e482e1e1ae8cfa50e9032fbdb82c0ad7621beea6ddc2d","rent":"3891c013103fa25a47451be90f63787ed137854ee15bb186ec99cef6c9dbc2c3ca7ab1dcb55cfafcb116c1ae69a2e385c17add0ffe5ebb6ae2b3456c19dbd71763eb9514d9c1ba5bd046f30e692549568d01113d42a2732aecfba6a38cad50e1a8d72fe2d2342248469c29e4817622503576769e9a81e938a206694ef720","p":"2c3901ba21f37b3e90c6aa8667083c7115e02f8d075ea8e72e15fae6d5063b0dc1d163ac6c01588913f791c1c8bf31109db77cc00c9016afb1c1d5b18351b65e264105f247de94ce648613cec0e7e4f7450c11aa795078d23268a77e1294ecf24647b0fdbfcabe8913649e93cd44c8e47c6a3299ead8da17f0c3d41244b6d184ca08ef34a18544ee7ead4d8a6012ecc5ac6c3dfc29796fd4304ea4b8bc5307974f8958d7131c3b90fc2ccc10da10a415b24a79f5efab57f6de","q":"2ff22f9c40ddc38601b068a121000e0bb710e9e4d1af565b4243b95141c7879622b398ffe741a4a1ea34044fa718af6410fccc3939309037ae83afc16f923e81d3129b8a5a6bb57700a16da469d3e55cf5659059f501b77224e0427e738bbfc6ec1ee404ed1c61"}}],"sealed":"241b000861771e7a4da3862284a3e5f82b4628e503e910c6a04ed1342e60e7175003a674208b16dc4c1d7cefed80e30465627db7d256de650141efa57f66befdbb725eb7310ccd476f14ebe4ef92e6ff082058eb22123dbe0a332a5afc84ff70c42258524de966956df4e9ee4773c8028e2470a41b2c1eedf17b5b8ba0f097d4352750d841eb1f2a574de42b332beb44de025a89ba492e59c952e1b1c83dd1e5527aa1e6"},{"id":"p4","mission":"courier","title":"The long route","ticket":"Three deliveries. Watch which lines have a star on the left and which do not.","code":"int x = 1;\nint y = 2;\nint z = 3;\nint* p = &x;\nint* q = &z;\n*p = *q;\np = q;\n*p = 9;\nq = &y;\n*q = *p;","ids":["x","y","z","p","q"],"hint":"A star on the left side means an int house changes. No star on the left means a pointer changes and nothing is delivered.","scene":{"spots":[{"id":"x","kind":"house","name":"x","addr":"0x40","value":"1"},{"id":"y","kind":"house","name":"y","addr":"0x44","value":"2"},{"id":"z","kind":"house","name":"z","addr":"0x48","value":"3"},{"id":"p","kind":"house","name":"p","addr":"0x50","value":"?","ptr":true},{"id":"q","kind":"house","name":"q","addr":"0x58","value":"?","ptr":true}]},"steps":[{"line":6,"ask":"Line 6 runs. Which mailbox changes?","options":["x","y","z","p","q"],"sealed":{"x":"b56c6b3f03b0fbcc99c381aae5616d87170963f1b45a0f861232b628a26977719d0c62fd9ff6c26271cdc71e9961e74882f8e09e7134c5a65957e15895498a762e773ce69ed33848f1faf2db554e6843d6799c02374774c3701ad463d13c5e269ed4fc054e44250113c3bda21e16823c2ecf364d4147b4ffd68f7709b03541c63aead29638b12c4d19e2351d66d6efb134573014a0fba08f146ebd8ab924dae32beeeb781fd1db","y":"85e25973272a5b44755ead1c60877a9830381e13e58c49e0064ebdf208db6824abc97cbe13c6d21fc91fef17c7c978b1da85a911a7c2a4892a49a21f81816fad027ac668362c4b5e61f02da1af21f71204e841bb558c629a42ecb6f991af195f28efefdce346fec1","z":"2ae95c0e8a69d572d6dfb9252f89024a3c42cd9443839b9de64fe7a5b6ebcf483b1acdb39cf267b979d5fbe11cf9a62723b1f64ff82fbfdce61e48674b3a6e957ae85266bb32056a9891f806f6c1bbf697610725d6d49ffa098cb38a1f3b5128217512bc13106a7cc202e4b5af339deeb79b640b813c7ad159da5ced9b3dbe4bdbc5a41edacf4787a0efb738","p":"2f5b2531ce4b9fe1138ebd5740f637c6726f597b906e0d64c4a7f6a762288ef7893803afb47b2e91ff49307648239fccef0ec0914f859711bd9058b17176be76d8e2f2ef4a70d251079a556a326b1c4c20b64251f5b7cacf705cf5c77ca8b215064c2326546c14080c6fa0529b58073bf25fe209bed1e6975625e21cc5584ebdd9646d5d864cc3613e97609204eeb1e9c47099","q":"f35aa8b521ce6cb44582934949f0b6afb586f284be4630712898ea34ef7e64cef44c1ab9ce7f6dfb6026c7f796592a3717bba751f03dcc8b725dd4274516084f38dc68cb6930ed11bcdf0d0c42181f371040e5bee77f736806f5c1b6f338e1668104ce205ed5a79f6bb22451b7b7dac0a99dc8ac23ac452de363d52eb4edf617dd18d848f345ad7d7d"}},{"line":8,"ask":"Lines 7 and 8 run. Which mailbox gets the 9?","options":["x","y","z","p","q"],"sealed":{"x":"4fc0fd39d7e159d104e1bd49daa56b863eea3219f888fff660dd30557a705c4281279dde8a43b2062a48073bdf0ffdcb4930c6e11bf4b8e4d20378793ef2223eda94c95024778959bc615b88971da90cfac49caa013a6668aa420b756ff468e5e97edf2ff75dffd796fd7167cecc95709aa5966bb1e2","y":"5d4688cc3a347393b98bb0b781440cce4eb98e1eb2af512022573b4d6ccaed0a327a83a9720efad6e8dc3028c0c5f5570b973e3f390e6c116590856a8aa9","z":"9d10487e2d93dd9f10008c6552ca3292f15e1285183c4196de2b651184ed6952244e1f09b4f36551ddeeb5ea597bddf3b17a85f4f2e50f505073ec0f5fa01f68ad49a3dc87444df4c3b5dfcadaa62f0a3fd8c841f85273d8418099a2367bba40f921d967c6ac0ca23014284cdb2b10a444073b51b4f908fa27262d2731a0dae85d2fc3ccb8dc8a693a8b5d474a692767b423f3fbc44072582173985e158dfe212bc492ca2fe915aa061a20","p":"01c0bcc472cdeae8fc2ee24693ba8c2fc63ff1d31b62607d1210dfb1c7fad839e1459eecff0ab5c0138f465635b50076876e2a05bb1b67d3a446514628a27e1dec1b0d70230db27c3ac261daea814de26200ffa09f32cb5aa4c62fad43493430b285f6985c51df72ea5fa6d412aab8d23c6d6227416a085c67755e95cfa810ff780710fe972294411e770993bb6090cd6b4d82738b51c078ca57fc6bb7d60947f39d6ee3c13b71dd7da5a7167d516d51c0446fb713103e9131","q":"f5a3eec8e248f58b45dd478bf1940ee793a6c1e4d8bdd3c82c5811214b6a8887ad170fb493bae4195bcdd11fc9bc8f29929d0afe6700287917bc831a4178d1577de71a09f3b7fdc0d8f943f75507d5bab13b2015798da85a071912e86a757aa1193c31fb64cef8ec1425c5e49b68ae8db4731c4ba9592926e13c9c333cb1e802"}},{"line":10,"ask":"Lines 9 and 10 run. Which mailbox changes on line 10?","options":["x","y","z","p","q"],"sealed":{"x":"0af9da8d138a5382a0366b7c583d93860b852d6b4789e20c2c82e4f25c01ad19a830fc557e544d13b48fc2599d019086abb1bff868e19cb53b992bb817bae978cca012c3d904318479bc64","y":"86e17f42e934f15baa0f5ab8821635ea5f78768e8afe4cd82fbd38fb5ac3617458c1a7b93519126571f8b6f3b0e40631906c6fb87e4b8bf1472df2934a382c12dad1e08c6a218ec3bb8a09a8b1ecfcf932b2edf013e6509b305f72ee5c0a986f082ceac7af957c7125ab31a71dfa17bf751223f7aa0256ce1fb71f111ca588f5e9bcabcf17f93e4162db2476f5d2d4fff750","z":"7517f02a3a3b72b9cb880c12f323c6257118d87b84d904383dceaa938b8a74478e569157d65c4d26721a09750982bebfa946e3f6106acb5d0676bb628f1b1ae2dee6127f772f886498bb94777456e3d6eb6fa8b522f6894488012b481a6f43f1e8a196f43b81ea792a2c94980f090b38ebe405de0010d1","p":"65f75c5cf31279a35d2db33a5a5660fd7ff4d2303f93977f7eed87fa2487125b54c09f1b650f57a0c073a354bae7742c4b0799596e035f3eb67ad384ad0f8150cd9438b99f3c0596a7c11fc7c84db6c0","q":"4fec2adcd72b58dee4063beb25448d27d0fd6cc548e287fd3b3aa29da4c2ed684458f106bc8c1f8a4421e3d76477a68cb6e1e905fbf333ea0640288ef7d4ebfdb1db551f34811fe889692d8c03d74e3f57b9b37a181a0ac031872f48d70fa711979b516842adc313766ad891d45eff38205755190b8df4ec8a719f87ce3dff43dcd7f04384e7b38f22b2a183c3c4170c7e6dd88aad20dca4ec88dd4d4e3d5eb9b5480a69438554a0a7e6f6e846368783946cd76045a577dc47"}}],"sealed":"3073cd699581711324b3fe29f7843a8b80c39de9d68e007bf608575238b66418357a0e9165463090ccf6c5c6a3ba7b91c2ed62b45f69bb19f25fe31ae67fb84e2521b1b9bc39e31c77f9fd1062d20b12d494b9448ea7ca3899ad3630a82204fefb32ad55bba605ec9b983033431c949c929264d22dde11a2badb38bff637feaa721ca1"},{"id":"h1","mission":"impound","title":"Tow on delete","ticket":"The name tags over each car are the pointers that hold its address. You are the tow truck: when a line frees a car, you haul it out.","code":"int main() {\n  Car* a = new Car;  // space 1\n  Car* b = new Car;  // space 2\n  delete a;\n}","ids":["a","b"],"hint":"A car made with `new` leaves the heap only when some line says `delete`. Count the `new` lines and the `delete` lines.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a"]},{"id":"c2","kind":"hcar","space":2,"tags":["b"]},{"id":"clean","kind":"sign","text":"No car\nis left"}]},"steps":[{"line":4,"ask":"Line 4 runs. Park behind the car it frees and tow it.","options":["c1","c2"],"sealed":{"c1":"221ec42ec75be741c33560d3c03481d9989e27065e665078f98e696987205709e89d4d6add0c1c5263580de76fff3eda911ac8d851ca2dbfaea3c7dadcb31dd20dc92516c987bc1d3a09d2fb36e8fe7ea1cd45ce78bb45593b1268325354ca38c30d0834fda725aa82929d7c2a6a0573109e17","c2":"e4db7ea5b7551dd56c928b7cdcd852a1ab61550f4dd49019f10ffc9126bd871796f93a1960ae46d8ba4f0648380afe21d2550ed8dfa8cde13187798cc649a3600b1a183307549f21aa42f806b6904b91110a7098eb7e3edf3e38319e90b7fdbfbbe1cc1c8e88443d"}},{"line":5,"ask":"The program ends on line 5 and `b` disappears. Is a car left behind on the heap? Park behind it to flag it, or pick the sign.","options":["c2","clean"],"sealed":{"c2":"dfb23d03ffe9937331a0dd3986e5b20172a4fbce7c8c7e8e703f8b78700fa2f0d2a9462ca971d5c40f9c3eda5da03ffc8cb5301cdd736cb8823487c70830af986cc47778f43a90470ca857dba68e2d5ca51cd06a736ac11b53dfee976cd3891fbb80c142eb894a08141aa7758123e6829e9ff6e61840274f187baf65f55b04280121ef82a56911f8f6345800a3912811914f2ad175cdbb39fe00f922eb02e1d155cec7fa705ca7c804","clean":"9e8a227d80b194154104f4149993cbbcf8a451134cb689b8ee0fdc734c64c128ab4393b709ec177a3ebd208e257d8fd11b69e6435655382423cc4dfaf1517dddabeff2943e46d7f12f11b93ec5f9e660ac34c432576f820faceea11aef3b4663dd3bdea2b31363b0aa1571581b8ab6a0d31608ea5a28e443416254b5b8d82926769cc1948ccf254d789a"}}],"sealed":"249628db0e00da35fbb9d2ba6d0a875f6d80441a83ca188986ef539f76f1a7fe816d012801d4c501c77a8069ad1787ddb159262f391e006ebd387641b06c8041b9703fa10255e9870e151e37981911225714a184c762960a8b264b7ef99670a9dddd6b9ec3761aa78d206084f8308d7a6b65de8d694bdd9021b6b1cb4bb398eaa01d8d656a6f9e260cf0b98c4f06cbe1b2b62615294d720c79c5c4c7d0eae8c1b8a1ca18814dc628df3c"},{"id":"h2","mission":"impound","title":"Lost keys","ticket":"Same lot, one extra line: line 4 copies a pointer before anything is deleted.","code":"int main() {\n  Car* a = new Car;  // space 1\n  Car* b = new Car;  // space 2\n  a = b;\n  delete a;\n  delete b;\n}","ids":["a","b"],"hint":"Redraw the tags after line 4 before doing anything else. `a = b` copies the address in `b` into `a`.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a"]},{"id":"c2","kind":"hcar","space":2,"tags":["b"]},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"bug","kind":"sign","text":"This line\ncrashes"},{"id":"clean","kind":"sign","text":"No car\nis left"}]},"steps":[{"line":5,"ask":"Lines 4 and 5 run. Which car does line 5 free?","options":["c1","c2","none"],"sealed":{"c1":"eeb4e002aaa9bc2039bc54b502c9598fec5584f1653b2995ac72e94ad7fe1a60e9e6631e6f3a98669a05afb1ba6221a2c4dfedd91950cd5e4ba813b3a9861838fb18f25bc7c99c1531815be189344fec4f942b8907ddc95c61c2a26b3f13b582cca4299f1c59da05e348cb88d96782c08383455e59d84ec9d5a358caab1dd53b69bd8875456db9be65e2cc95f38e","c2":"472626fee2a90cbacbf7be490f61ef0b869be7c0213e16c5651439a74472845b2e7299bc9abba153d1589e4e744e2104c97b86aa7fd2aef293480bce07445b1d661535c05096d8f6340fc4c630cc937aca36b1625dd82a41bc8894914a4fa7c73ee17ee186b2f3e5d0bc5b7bda70afd2deb65852e9c4f77ca2d8dc590e5281cabd2c87a7f0e708a9c4f458138da9f161fc5adba9cb5c67e07967853837f31f38bc6ad64601c5fef0b5b9dc657b4a79dc3c5aa61db97243","none":"c6cdb24ac71999d136e07213c52d102ca0d294d2dec47ad5e86f52b9386ec9ad53220f90c060405e64bb6b3e0e8fbc830604ab2c2bbcea6fffe9bbf3562c0075adf58bcd9a211591532af2653104c61e4cd030c302a9bbc793db61b5d0adf682bb3059afe5a3d3fc3a12e9c77b920160ff6de8"}},{"line":6,"ask":"Line 6 runs. What happens?","options":["c1","none","bug"],"sealed":{"c1":"9805b983eb440f835d502569939f5f7b4ffaa5d1b990a937f70288e18c587e2cbd00a6170c2e3d041112d2910c4a3e2c5c76b212fe29b685afa7e6ddf802ea3f60305d75d4e18e0e56a9d182d1dfdba210247d0a314dc771da6ef344","none":"c995d39eb46ebac38624c3a19264c7b2d87bfa6ec3204315d673bcf1136eae4fcd15c14fac72b1afadcf34b2e122406c08b0bbcc7779fc4a9bee369d24b7501f3380277534d0213663e94622d27d827e93d01436ae5bea365836fd36d094fa98d04b6f639098de7646f37e7969370ce71de4492d0d8a81","bug":"40c092f56de60314ff35a0bc13eda8f17e7a02e71053bc20de0d6033d87bbd5756ed6648b485e3b1dd689a3a6bbfa5443b507a4f8c90cc843387f5e0237b12e4288eb52264d9d2a8b0a2b25e731a4ca7f4f548ec42342cda351da10d907e213ce29d2769614b67a882c136a9b03a2d76103e06d8adcba590f2644d3432abbe1287d8f99da1e53f3ac833c67d685237758bdf2997f803bcf9a2be0366b67561011496cb34222996a8b965b82ef2fec2ebbbecae64d0d63e4f4c26a678b2c54846d4ec66989d54d33d6423c4d9028b0b343819f343"}},{"line":4,"ask":"One more problem. Is there a car that no line can ever free now?","options":["c1","clean"],"sealed":{"c1":"e7165e4c4f3fd63df5dece7837bd0072762be37a806d3bb65e06624c159294c1e6c680f58a3672a0033f9beae1e38191dfd80f4e8b6229e95b93118ac9fc03c1bb2fe976c4d3b4d19eb386a4e6f1e9c1dc4c58b198686b33408e78eff7d68d44f094d5d9ea96ca60fdfb3d648d3e5147c0b4ccf8c9fc34cbae504f726c7526be603197c6b21b4e","clean":"ee70aecf94f89273a075c5719f1c31f03195272303a5015bfd7e29a9c69c62728077b7408d32d46a3d644bba9ff658ac4afd0c0bdf301c3ad76017a151d9119fe044fdecd029c5e463a40ce10ed0f468ad1217e6a7c53a61c51141261f912a8a3f"}}],"sealed":"b316134980cc5a0cea6f5c43aaa6e541934daf90fc45400d7f30a558c8d77fa6a354c09f6295391c414fee82ef46e2016733d846501289e3ab2cbd079f0b26a664540f8876ffbdeee32b83388f794929ff6c518f027f4e050f193300303ae34c690ba20820cbf6167f2c770358af0c5400737096a4aae47e0e647f44b7a5fa75b3d01e63939048473d8e49caadbebb5a0ac3670920e87f5bac134c6e38be52ae5670a593a1e613f4d10df3237c3f3a314da52d88581db5aa39dd"},{"id":"h3","mission":"impound","title":"Shared keys","ticket":"These cars are owned by `shared_ptr`s. A car is freed the moment its last owner lets go.","code":"int main() {\n  auto a = std::make_shared\u003cCar>();  // space 1\n  auto b = a;\n  auto c = std::make_shared\u003cCar>();  // space 2\n  a = c;\n  b = nullptr;\n}","ids":["a","b","c"],"hint":"Keep a count of owners for each space. A line can take an owner away from one car and add it to another.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a","b"],"shared":true},{"id":"c2","kind":"hcar","space":2,"tags":["c"],"shared":true},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"n1","kind":"sign","text":"1","big":true},{"id":"n2","kind":"sign","text":"2","big":true},{"id":"n3","kind":"sign","text":"3","big":true}]},"steps":[{"line":5,"ask":"Line 5 runs. Does it free a car? Tow it, or pick the sign.","options":["c1","c2","none"],"sealed":{"c1":"3cfb8103f4c156d0f1647a208d94e659e0d790aebebb103b0adcfcb85c6da240962481cc9ef8a18b7b5bf7b21c97e1388fd7de3d12e9562a78a9f22d1d823afaa17ab531c12da5451831ca057614b7266e73276c49b48bab0de484591f32064e9b131d05a86ce3b958220e0ad6de971ace91803b860e2005d20a30b8dd","c2":"f312faca3c35f334a609a0f4af8b81d571902724319b05abf35d7ec2f8760b3fd4a188d95df57ad749db704677ba629bad815f3e809877e5c40b29e50a071cbcb0f31431216e46606b3c5a9feb9a26fd32","none":"8be13f234f93048eee311f522e76ae79f5b19d7457c32a362c0e775e51347ade69da9a86b5fc9ae3cfe447fc52edcf44f9620ba713ba08b3aac036a892bd2486cc7f3ffbe714210e2811ac1b873986a905181a2b010a9fc9cb0027c0791ac5b1bc3900d23ca37d039159dfb2cf9eefa65137374eafea7b9236e39f835d1d7c11bbd1b2c3a6587544289517c9e39a13c416d07253447ca30ccd3b904228078fd6d076a94d19686524a9"}},{"line":6,"ask":"Line 6 runs. Does it free a car?","options":["c1","c2","none"],"sealed":{"c1":"e6f57394dc83b296df5691b527102e2c1809f5579336a66a8e249c3c09dd5a3392f4574cae0776b8d8c9a3e3eb36646428e485ae20da767f2ce91b4ac739b5c7dfffbb2e7d0335220eefabc125b44e3df6bde90440151d1db6f708e7e280d8e53a8c5791e24eec927bc2bb81ac2338f5fb3b2caa9e9e3f135d3768607c8723609e9837be07c4422442afde33ca65443b64","c2":"7251a3e050503e9a7e5bca3317cd265821527f99fde5f5e8bd4acfbf0838a725c8f7be1522e4768afedd5aa761d29ba50ea655ffed55f8","none":"b2788b822984f5909e23ab462c42f4f091f79a7abdfada1077ea13a35faef8b28b30ecebd8f9c37af4da5f1e79ea0f40975b7c0c15fc48998399b68f14f6633b6df2b421a219a328298af9502326778cd6308171de60844ce2602c9ea1571d927a66fab3f2586da9b8e8033ba4aaa34eb5b35e41fb3ac04979dfb9bfee693de8ad72b6bacf99494c09f3c7a8809ebbf33e0547b426ca"}},{"line":6,"ask":"Still paused after line 6: what is `c.use_count()`? Park on that number.","options":["n1","n2","n3"],"sealed":{"n1":"03de2ebfb6a6b1f66b2b9b840fb40fc1389e6db24ae8dc9096d6a0dac616ba14008f844e13de7be26e2bd3fdf92a7130c1706f56affb20b7b129235daa5adde093576bf6cbeaf78141e795a53752f890186e5d","n2":"299715a1b8382130a6288b10392b617a5024f8c57fa0689b33dca7cb2ca15f17eb7947a086dbc713d0c1ea9b1c209737ca0d7252cc391a2e6aebf007ffed35fe5eaddb050848f65bbae83f389763d8f914061dd0292909c330e6519ad2b7cb7ac52eacf2db59a4c0fc0d168dbf32","n3":"e880cb83a668c7f295df33de94053ec8bf0468e04da16f7cd263e0c84bca4751ab1a96a59d669ccf10e401f26ecf2e55e7179823e8a350046f77479a071300220155a6bedecba4792159a5c35b41b3cbb30eef5d500c6d52a93941"}}],"sealed":"ca962374e316589f6ef5e89e7a3f9d936cdb0ef7d80ee5be7f8f4eb7f92677b9f189276a15302fe9a31b49e6e93681d9a0a649f6188cf424ae9e136c118e1655a515d45489f3eb84bf4f6637a160565ae4234afdab9ef06522731b869bfb6eb55546f5bef8cb2c4a6c065b61fd11060795bc2e9acc3e726fadbcbc8ba78c1b01ecd13a65b45c0aba220df8045cb263996eb6f214cc53ce6c5d6d5662b5f12f34d5fd22c70520fcefda70c7be8379b433c6d750849a7d0f56c890457dd3a16af7ed2e9db69b2c42e0f2c67049b043664057c4e7549218a138"},{"id":"h4","mission":"impound","title":"The car wash","ticket":"A `shared_ptr` gets passed to a function, then the owners get shuffled.","code":"void Wash(std::shared_ptr\u003cCar> c) {\n  // paused here\n}\n\nint main() {\n  auto mine = std::make_shared\u003cCar>(); // space 1\n  Wash(mine);\n  auto spare = mine;\n  mine = std::make_shared\u003cCar>();      // space 2\n}","ids":["c","mine","spare","Wash"],"hint":"Line 1 takes its parameter by value. A copy of a `shared_ptr` is one more owner, for as long as the copy exists.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["mine"],"shared":true},{"id":"c2","kind":"hcar","space":2,"tags":[],"shared":true,"hidden":true},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"n0","kind":"sign","text":"0","big":true},{"id":"n1","kind":"sign","text":"1","big":true},{"id":"n2","kind":"sign","text":"2","big":true}]},"steps":[{"line":2,"ask":"Line 7 calls `Wash`, and the program is paused on line 2. How many owners does space 1 have right now? Park on that number.","options":["n0","n1","n2"],"sealed":{"n0":"fbbaaa4a73ec6b145e5c080db5e84f126e78adbe01daec6feae42d7091233c106d11e7d7191a19d024b264c4e550d1df0d023e945dd910ab1c371d1be8e0f191a9aef927194e923841929e5016a9d63d905db64a504843c7c4f282d173","n1":"917a5cfbb361197441feb3593a50781e2ab9fa7c6afc89dc12699c0c31bbb0c1ba54781ebd72ce6ce1fdf401a13fa6f3b7b1c4c9d7e12fc260f6553d8a33781e8034d30c8149b42a7b780b3fea032a5f428c83f3fa28555ab6d736ed4b2be7525697bcdee79c945dad13a7fc20c63bf983a1017277","n2":"c48e0a359cc2360fadea9180c98a5883c4093afecdfe08ba579a98ea59678e745f59c49d6965d65f46ab19256b020603da691b5c630d284c6d8f1b6c6fc3946894c1f46381cd2bb80066e11505d881b9c8294c1da4bd8dd268617c48c03527553f3974f6e2e8c214ee4f7f26b0417137a35059f4673f1303ceaa1350e72867b4bc5ef417c312a786f03b5a0c5b3e1666e6639407ad150f2939bbcd4d46b929c14a69cf85cf6559ba2cba"}},{"line":9,"ask":"Back in `main`, lines 8 and 9 run. Line 9 points `mine` at a new car. Is space 1 freed?","options":["c1","none"],"sealed":{"c1":"87e57beebc6d8fb5b832c0015023421dabd2dcdd44f8a2e0ed0b52bff6818aa065722b5b37b32a17f4b68d3063c888fd3b0a033667e5676529eb9b9f3ac4e16603a8ac130267759de27c71f289f47de1c53a4be427fc9cee938c263ba54fa0aa7af9d9577809b30f86f71b50ecb7285d753f89fbbf16bc26633c4e112bd99bf26e0a52","none":"81da123fd01a9c24266472535445e1f39fb5a262f3908e9db0b01bceb93ab5312054d9dddba384e682d60ed1e029bbb9ad713760e635b2b14546fdc207d0915732963b3532e639a2ff9739fd744f1d89ace5e9915753fcd199c54b919eaaff43c2406d0a28b85bcdf1b5cf39c137be09e4fa15f310cfb4583554662565f4fd9e5894bf8fa6b214d86da49b402b7200fc751b0b563c9e18269aa66ff65f58d5f0d6d08e85a45e7291c30cfd4770ea28779b8855cbe4347c4d"}},{"line":10,"ask":"`main` ends on line 10. How many cars are still on the heap afterward?","options":["n0","n1","n2"],"sealed":{"n0":"a9dfb48a1b2337f0647793157a7e9a7c85b15cbdf6761c85072fdc4c42729676efd912fe9d588be90310e7028d7afdb954631cdacf7006e3c3d9122661e8062308ce2f335bd50c95b9be5b45323b75928d8eeb29444b2dee71f6f43e4a3ea4807a7ee575ea739e378f6da1bd019ea907e183fc06093de0d89896eef9fc94a2ca5339c2a95dbf5d5fc4412279541687a5d75c92526b255f4d94b982f8f9d09f575c046535686fc9771c7f1a4b85e75a7fa9d93a597a25d3751b380419c25906","n1":"ef571798b3b87160e651da42368aa3785f2f5f610bb695bfefb27cb42beebebe480c5fa4ff0608b5a5ee5544a19bf20fcbe5fde154cbfb2508a432737d9937e8dd5ffe0e97fa1807d437ccb67a515ece4455b5567196d28aa09d42552fd9c8c05f","n2":"288026c24b64b89dee1a694e78d884d1e7830f6c58d9f64945408dea4ee04938ecfe70feb3acf93f3ae87ec5e9bc5d326401c7b51d4e07d6c8915e928e6e2cb2576db5e7101001caf4514baafa8877d1d1f07e68333d640e8c34cd632532d5fa697203a860aa70f5ecbf9cb8682d74e4165d"}}],"sealed":"74485ddea6adbb40e362616a6f047088c56f1453459b50f339d58453005103440fcdbe6ff04ad9ac7c8276c755c6d91d474800a6187b69c57aab02b9ff2249f84cce8f4681f91a96a9d706996d23ca4c1ee5662a2ba41fab45ea84444cb6f7d65537ec580f71c7fb4661a7f27c6da741151c3d44baeba102de99c9fc80f897ba2fe5a594bdbf204a8a7be243b59c2fa5887c8e99adca1e0828dac1aac1de8a0cf274a19a1f6dc859ae0709aeb903d817c77de5aa79a1231276076c"},{"id":"b1","mission":"shop","title":"A quick paint job","ticket":"You drive in blue. `Paint` is supposed to make the car orange. Pick the exit that matches what line 8 prints.","code":"void Paint(Car c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"Look at the parameter on line 1. Does `Paint` get your car, or its own copy of it?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print? Park under that sign.","options":["blue","orange","err"],"sealed":{"blue":"f8ea803fb91dd10ae7c60d0e6553c2ce2422b6c1e26ae86016ab2254b6db6b862cc3aafb460b3a30c4950eb6b4597ab3a4b672ad7365bff379a31ca7301a7750e9b166ab5c3fa26ecbf70767aa1196f0fa9ec5568b7c0c161163fc59018c4eb6077a420d2278","orange":"65a7a4b8a85219215ef52e6d2c531b600f041b63b21a597c78b8f348cdefbf272cb4e86fe12b89e6182be2341f81a65e76192dea725a61236a2c19f9d04618115d1d057bda4db95013a80c5c2cb393e7beb34321a38f7e8a2326b49828a6fdbee6ecb2d82b210616a55b1a1827e92cb7b68d16f3d523d8e48df5a73742cae8bc0521653930d881013762f2fbe4a6f54b0f08a0b2df40d5b40e110fb1490f9868b1c70fe1c3ec","err":"62d8898237954130abdc2c8ed391c1bb423bcab5375c9b4ecc1a453fcdc08752e1e6e0da95f9ffe0b90e313f18e2681c998b937259a2a2e4cfb72f7ebcbb6df05b78a3f578fc30e5b2b731becc2bca36a7c31eedc93be7d3fbf8b040c2ea7a7c6c72b83cc997eec134"}}],"sealed":"812a2ed3f9be76cf84674fdc8c25620bb77eb8cfebbd7b36511c91850f5b08a86cf383a7e8e059852681770962b8fbc7b586e9e3348d004027c04b7b25a6f7e50821fb5259462c8170a1eb4495feb8943ec069b8d9aa905d23bbca7d58387d4be96764a9c2dcb80516f071342c067f7c0d9d13492446ae"},{"id":"b2","mission":"shop","title":"One character","ticket":"Same shop. Line 1 gained an `&`.","code":"void Paint(Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"With `&`, `c` is another name for the car that was passed in.","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print now?","options":["blue","orange","err"],"sealed":{"blue":"e5cdc067bdd6925e2ef4b6b3d7b76d81798f3de5201f1d8bab03afdd1dd992c7847c84b3b975ab8fb085fa8700bfc15c4ea52a8e8ff4ba5cbb214edd0eb9497de64ba243924662ce5d0146f5ad671a58d6be2c7bbc4827c419e1e489e879bcf821c2332c401f7c551fabe7ae790c42e317752c5b7c37355d9836dd85ed57d354","orange":"64f8fedc6b37883c53eff13e062347d996e132397a21c4b908dccbcb4403f348f597cd2257104f419dbe6439cd058fca87f0aa3736029af3aee713aab043df4db4c60d96b0e2a94b3a312ffa426d38a3ef02066706010e291b0e73968b528deb3ef43e526e78599a7c157c8e660a280a6d019ba73cf5d95ecb","err":"c8a37478527754ea527e39fc02e3731509ff732566f28bd371cf21efee9c5f6a4325b6e50753845b03a6ceeb97701564daa5cce82df006fb9b94ff519ebae7392bbb2c1be4e4cedbdac429fb20625041a149e0f4eadd6e2706c4ee"}}],"sealed":"c173c54cad048357b2febfddc5cbd6a99c10760f363af9ca713e54848a2c763ae5813cf873cd722c921ae6654dd850c59353ddb48704f5205e970bf0f59ce9a8418baab9a238a651cdf9593ba8bd523b839d1849daee2d2d0ce9aaa34992acedc3d9d36b7e0eb932a8af3489998aff7e0271f1608f7e3399dd51dcbffe4d803f6c797af6be3dfd7657d33dfedcb3b6d909432627c7e1c8"},{"id":"b3","mission":"shop","title":"Look, don't touch","ticket":"The shop now takes a `const Car&`.","code":"void Paint(const Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"`const` is a promise not to change `c`. Does line 2 keep that promise?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print now?","options":["blue","orange","err"],"sealed":{"blue":"14af359052244dfbd268af8e844d01242f6ef252aab945a86c372d3eb1dbad95f7735185ecfebeb9222b843cc0d1d62260fe38db6323969a68dfa56e22088014ef10d38d372013e7f08f3931a25297ebc590a85ae2b3db34d48ae5f7338f653b7603cc8bc28eb4e6031c53df597af92e587d9196201b67ec42bd90ab2327e7dd15299be348","orange":"46e3c2ecafe101e21488974575f6da97ea40e01cfc736829f0aab7de31d5427f0de2120d29e2086ff70a8d2654cb8b559d9228fa86aed55f78d38de36786651608ec87beee82cd3ca616762370f3234674702c1f7235975db0dbd4f93804c8dea0cb7cdcea9c5d938d9e70fa2743d08c34cbfa31","err":"573dd781386cf70deffbf5246c938193834fd3cde8b74e4b6da47ea3233795a2a221f87ce22ba5d54930c88d04c7111da5e9246310e10fbccb94cfc4560b23e892499528b8a73515f62558ed4704e7d067e8c9bb0308d5e964142d03d607cbb310441dc79ad79768ee112740cbc22a848221e3827ce3844cac3a8805dacb3acd957a74881db00e92d08b1cb94e18ba0e8229f66909052311c8d97ab65d930e5c2e07a1f7cfb903c49cf93494976c80d7a4860011842ffcfc3c592ce04e845fac4be7dee5ba2077c96bc063ff5fa0"}}],"sealed":"059fa37eb58410dcedd868602cdd87207ae637fb2a73941a5d5bdb2573c87f69707d6a2808fe5c7d5056729c117a54889676028ec1c16d14e11b8eaa67a8522aca1e935c9efa9674c82ebc6a32a08ecb6c6324c0f9f27343e14d90d8366ad5e575f05435f1e47f58beeb2aa3127909417775383c987eb35c36009d74cfb55d5fef3ba3469f258e0c6c87e995f4cae71a0a4cd5cb129e9e8ad4484f101ac60b7183b309c96ef313be4e1c395b403b21b45f7b380eab69ee17ecdb07d9160f1be1985d67934b0bc796b829aff208fd29b8f8d5d3"},{"id":"b4","mission":"shop","title":"The loaner","ticket":"The shop paints by reference again, but line 7 makes a second car first.","code":"void Paint(Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Car loaner = mine;\n  Paint(loaner);\n  std::cout \u003c\u003c mine.GetColor();\n  std::cout \u003c\u003c loaner.GetColor();\n}","ids":["c","mine","loaner","Paint"],"hint":"Line 7 runs the copy constructor. How many Car objects exist after it?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":9,"ask":"What does line 9 print?","options":["blue","orange","err"],"sealed":{"blue":"5e83040588ce9b4530829887b92129d352354528059c15cfbadd71cc43bb2476b742b06674e85c34ac0df98c9ba8b90bc2c7198253980cbd74d6bab44fdc5e0444bfbde3033e6043569497304eef04e9fcb09c48e37f6d","orange":"29ce3bbf9cea6fca0834edda0640974ddb1f43fd470e1beac04c54b78305113ed6cb3385e10f66a58d0248fe97afe94e7d69a3bd33ddc4b6e63112b0227ccda29fda12a0e666723cc423ef89b2464ca9319cf10dd6af2a30f50b1ec6c9fe8a6e3edf4a92c1d9b9c65694488f7312326bd2b0617310d79a7217b8f6eb0b94c794b7dad77b3379a80a75a99870eba8de55fe841045e5f8acac71243a52657258f7f3ba6924e7","err":"f3fd9d176e35cc24ffe451c32f95b73a43af1fca6d19e0d9c0da10487535478b823a6fac6641e65b3b71d401ea16825a1685a08b9fd92ebd920b5c8c26cfa6285aedac9466d542e7fdef6b81ba427d0db25458217cfa225622a8d553d76c2750fd18ef2171"}},{"line":10,"ask":"And line 10?","options":["blue","orange","err"],"sealed":{"blue":"288d45bc75e28fbb18c1537c9d32a82b0daab6638c0edd6e7964211b22c1ebe9bd3aae1e78ef8388d4f4efa7ee1ad98a854ac9a108aafdcdd84e3f8bbaa21c381bc69dcb1bb09f7d6cc981e835208a421889831f02c863f1c3d5658cfc46324418e46e8c24a0965de40fc28ae11ceebbabd1276bec6f5d9b2e","orange":"962106b128fc7cc4c734935bb8be2d6f29b8afa6b1703ad73b4c45e185341a22251a0c8d6df880851be5272c96a043f0ff64659df26622302fd4c8c211a5","err":"0cce7110a89e07656015eac21a561852a1e224ceae1342699d8cfdfb4bb30487e1fa8845"}}],"sealed":"5cc5ac427340e6cf7fb1a845f70416464bc38171cf84bfdc2619125cc443971850b6a33a8fdb6fced3c8dc5ba7ff498d0c1aed09c7fbf7447370bfd3d4ea34db1f33554459b80a100c39da843d855afe359f08b0d65dac4abde1c41bc072fbdf8e9690dfc7a96c9a0bbf27b853dde77803b741a4a0a459cd9d53be447f306123b12d2350f6fbca7424cd06c60582827a6aa69cfc6f79b48af49eab6f691e"}];
+const LEVELS = [{"id":"g1","mission":"garage","title":"The couch run","ticket":"A couch has to get to the pier. The job is the `main` below, and one class name is missing. Take the vehicle whose class makes it compile.","code":"class Vehicle {\n public:\n  void Drive();\n  void Honk();\n};\nclass Truck : public Vehicle {\n public:\n  void Haul();\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  ____ ride;\n  ride.Drive();\n  ride.Haul();\n}","ids":["ride","Drive","Honk","Haul","Wheelie"],"hint":"Find the class that has `Haul()`. Then check that the same class can also `Drive()`: a derived class has everything its base class has.","scene":{"spots":[{"id":"sedan","kind":"vehicle","type":"sedan","label":"Vehicle"},{"id":"truck","kind":"vehicle","type":"truck","label":"Truck"},{"id":"moto","kind":"vehicle","type":"moto","label":"Motorcycle"}]},"steps":[{"line":[16,18],"ask":"Which class goes in the blank on line 16? Park behind that vehicle and take it.","options":["sedan","truck","moto"],"sealed":{"sedan":"6d0dfbd8c0de41224089bd90e33384f04abbc7dfb013dece9f0783fe4a780e5049eaed0144010c80395d02456e7b5e41ff9d15f1b9d5e0f31920007df7cb39bb04fe9c5dd06eb1f9964e1c975abc98460ee137c39c94544087b8e92f3d8d1c5030713ac1b41c7c9a14029bcdb0290327ada85b72a49b929b337cc556fac4641344b4031bec3663abb92c579f69ac502100f60b38650ba1971e346487032ac0a54f593d9a876be1f3abf84d427bb3a1c520a5fdfeaff88b87601591d623f66bb600db718e3f36082e2101d5aa","truck":"12fe7da9bf514b7c670dc71b0cc27c87dc45d81e1c176e82477c543c095256d100dddf6ed2742c29d46d5ba70cf65602d8207079f5dfd57717b6b29cbbe15a71322ba494b9a88928cd827326c1f833ba1285cf66deeed5741d8e9ecd9c8b3be9d9e671fcc7cbd65ec06781068421180744c09c882245ec9f942f15f444f130c60a340421c3f5b0c3142e93fd120d4080f545a1db638459ec8c42ff9457ad461ebd845d3eb7776574ec24682e188b57","moto":"f44d64c8b7bef468588f352971b165608135831ee93c92817e01de1ccb4a751fa3e0ecf08926c711bb988b3eb0a0e6cec673b18f7bdf41f47dc25eb3c287099ff76bc659da5f5dc27620cc3b104c468fa605fdb659e8649e7b64aac1c4932fa7d905666823719c32dee864b3dc9c47423d22eb3bb9a750d1a60705b60301005c1523963801e4e10ba4b2282c787a19c0f403da61b8e444bf9c9c91b39413960719eb7e2c02ad306161d55795f810df49f48bddc1bf56fee510cac180570a4d2a613ce9df33a9edb36d45a9ad14961d5aa43cff3236d4a0aa64b005535f92c43296d0a29c1a205845bb2ffbd0f6409d88f3f642858ffb69035b5af7f4d25e0d97f50a69155748e1"}}],"go":"3d44399520728bd93e0799512676af1dde1b7e7c271e381072d646ce45432895a3eeb55d8a79922840152e9c28848be3ae67bd618426a134f29654820d05ffa291a062dac133ffe9cf0e4a6b6caa6dec6a226bea95","sealed":"93b08df8dea2df8d5d101e623bbbd149d1e9fc6f977616ce3243644ead50e48ff7cf363be6bb2d298726e1e6519ef332c326e096f8521eb00b4f438e59efedcea346ea9c498990b87d284872696ff0ea42b9e16dc73971ee4fcc7e62795ba75ce056b82d93e0d1e9c6976aa7bb24b7310f1c6e9bc6e4acf2080f51a47f07104d9e13456d20033fab85c7bfba44c83dab5a0513063c232b8d3b39f1296182003d29e6716f118c38cf30d0d3922234e0c84124d70dc17c3c233849ea318f6386015b3678f358f26ff83f317c673036615966c4f4"},{"id":"g2","mission":"garage","title":"Halftime show","ticket":"The crowd at main() Plaza wants a honk and a wheelie. Same garage, new `main`.","code":"class Vehicle {\n public:\n  void Drive();\n  void Honk();\n};\nclass Truck : public Vehicle {\n public:\n  void Haul();\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  ____ ride;\n  ride.Honk();\n  ride.Wheelie();\n}","ids":["ride","Drive","Honk","Haul","Wheelie"],"hint":"Only one class has `Wheelie()`. `Honk()` is not written inside that class, so ask where it could come from.","scene":{"spots":[{"id":"sedan","kind":"vehicle","type":"sedan","label":"Vehicle"},{"id":"truck","kind":"vehicle","type":"truck","label":"Truck"},{"id":"moto","kind":"vehicle","type":"moto","label":"Motorcycle"}]},"steps":[{"line":[16,18],"ask":"Which class goes in the blank on line 16? Park behind that vehicle and take it.","options":["sedan","truck","moto"],"sealed":{"sedan":"c993741a2e884966c7b7e3e551e96249b0d8b32c51c4907e1daa9098900040d4d6fe95748a752ab4c0b6ad232bfb56fae9fc3546c224751943605d5fc7db1b22975dac6710ba0ba09ce7cf5703cd243e289380565d8b3af4ad242421fe7d896a488bd19c7990ec9385be5c2b05b4a7e4e5a6d308ebfafa0daa8f97e930d6a9219362140b1bb21d02100e83169fec3f540f7cb39dd18afb04db0fa04f7318001c8e2913904ef3995f4f797e45ac67e245e5e553","truck":"73f1ae061e7e19b3ee4a85eed63d2ce5e2186e8f95a5e2dc44c1d34b3ddedfc7b18bd730de9a6f214072b61a16914c4468276c3273de0ec4335b4a7efb551cff3941f5afb90e5d0c0ba3c95e6b025f1f0530eb242625c72d5d8640515a1dd2178610b71fd3ac6eab33fc2ac079834db23e680f715946acaa37b274d7e3a68f9b9886d1e2823d4ded97290eded7b63f7a08c94063c7c9e6cc49c30be2f113994339fc33164b6e736862a6ef3d905ead93aba37171d6fd","moto":"5e2eed4b08631aeadb0f60a1fa7d76b602d74e89174864bd1328caa8d913edc9321e7e1391bb551acd93fc0c1c38930e74c58b97294ec1e5381a43c3885af811121a314b38604f4965608fc8605a1337a6d7b2e9dccdd4aba9feacc6c58cbee1ade696e2bed0de3fedc90f83328c723ed97a1b3a948c60ba939afb5f81a9b599cdc09d9d27045a0d054c8af998fe84e2eb51897edb4272616c2df6151e85bbca4b78fd1be24bc30397e01f13572022c61c445acd42b80b90f2a4e7c48cc560175515daafc9ecf1a7e84bd1d1c4cda12877bedbf55203c54ecee80c6b4a9ecd2914447ce6089e929d1378"}}],"go":"cdef7a6eb7b55132f215037746264fbe3d4588cc3f33510fa37433423a3a3d2c0a467d6a4c973b5062e0b88d001e9b4a305a2c0e1617ecc0e105f2873ea621be6fe9dd5a8f7d480654d75e3ca862","sealed":"9e560632cf5dd7ba1e7546ef8fb0dc395e2824e551bc5e060b2377dcab21658cdaed93a488db612582cd7ff46242b7b7acf9e64c0a52cdc44a6f375f7d5fe6a3cdeab0d99e6773062f7a246b4ee2050d611ea5c5c7b7c3f4a474becdefd6df55f3b285741a28f840e3776405a12bca0b3c05d984ff6bb6ba592c976a2deb11e79163a12cde92dc3f94a858cdb3d99892d661f96ff7c9a8db5ee096e3e235b497994c66ef910983d7b3f13c9a63487cc709de3d51a8f63e2072e024a8"},{"id":"g3","mission":"garage","title":"Two horns","ticket":"Truck now has a `Honk()` of its own on line 7. The billboards show what a line might print. Park under the right one.","code":"class Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"Beep!\"; }\n};\nclass Truck : public Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"HOOONK!\"; }\n};\nclass Motorcycle : public Vehicle {\n public:\n  void Wheelie();\n};\n\nint main() {\n  Truck t;\n  Motorcycle m;\n  t.Honk();\n  m.Honk();\n}","ids":["t","m","Honk","Wheelie"],"hint":"Look at the class of the object in front of the dot. If that class wrote its own `Honk()`, that one runs. If it did not, the inherited one runs.","scene":{"decor":[{"kind":"vehicle","type":"truck","color":"citrus","label":"t"},{"kind":"vehicle","type":"moto","color":"white","label":"m"}],"spots":[{"id":"s1","kind":"sign","text":"Beep!"},{"id":"s2","kind":"sign","text":"HOOONK!"},{"id":"s3","kind":"sign","text":"Beep!HOOONK!"},{"id":"s4","kind":"sign","text":"Does not\ncompile"}]},"steps":[{"line":17,"ask":"What does line 17 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"75b839e255c14d59664fad59219135d1b1674149921159b042252d7c7b2639c96a136fb761dc4c5838c2504cf15b8a8bfde72951a890c2346ee1e6a517b66fc491cecafb4f3ea7571a8739a4a0d5caff369219c150826566fba46c304f6287c521b54094a9aeec0aa71086c07a759787913a516c77776117576a64ad771ca3","s2":"160bab9c76b8a7ef6a17a20c73a7c97a2e8acf06b96afabd3395b4e0e2431375ce1c12e81413b37a25ab75db2c2d25c6533a5d402f34c96d9d21010eaaa898284169d6795c91077781ddf9396a65","s3":"30b2707354f3ec711164d37a5e0c7fbfc28171bda6e58d98bd95ab94bafcc2494a50f4b3885954b82416c5f7b9f2775860d0311c8e49d0a74d43e2dae64bc636da9553f8d842752a13ab2d167663109db70d8a7e86275bd2931af245fac2858f1858bc7665660840d6e7aa1a1527bcb6545dc0907f5a16606470f01f1db6884c0177df260276c24ee571504d8f0849d74245","s4":"bf3a74a978a079af567110656181debb165eb36f3d37e453ae7acb1d6b984422910c71f2024a68bcf0a43472759ae9e6017e886bf01195c83baee0e049a331f6755ad6618b0870b026416b2a520b9695b6ec4eed0e12869c2a9e83cd6dce16e93edf3df5f6e40d7109fca9fd2d08c190399169310d1bc964716243d0a7f93c11c1cbf2"}},{"line":18,"ask":"Now line 18. What does it print?","options":["s1","s2","s3","s4"],"sealed":{"s1":"1777210e50029d9d8b39077c7da5f575c07eab878c627087879509152515f8a12b05d0544c52155537a0d8b1f775e272de819623f4ceae23a8bb6332730b65bde0cddd8468232db2ae03f171567a8cf461d5df9961822821d44cd550fe6860322ec5","s2":"ab17bbffc15e08adab5b6cf77fffb21806624fda1e40ba4725b48597c73a91c53be6e36606f720da84fcbd331ed6cccbc40c8866121d7ca4e356e03444f67ee61bcecca101d9131ee4dd11ebbee2f77aef7aa10a0e801f667ad6de9253d3d830c6109550ac62f01e33d10bc6dac6e7ae49ec7e378a3c71f4a0cd1f4d5f70d66c1797f4ffa783","s3":"5de14eb0b1c552a3a726d6de962b4c3d91ae62d352429ae1d6c00da932e377bc5233549bc392428f6e0fe4163acaa7959cf91d2b6e6277a55d256c7c93da2dc78468285b917f185368521d72f63fff1e43acada21a7cd0fceaef","s4":"b6443032f3f341395fc0d3cd89d403ab1c60331eec0c17159652e46484fcea27c9997f17b2c7751ebd54d89daa6f02564222281b64f77cfa04c0c8c3e7074cd07d649ad985929fb85810c0f8dbe469d83453910efe363acc3678cc7d5ca9caf2f106aeca95d8ddca67bef257e47f867c790899f5"}}],"go":"b59448d2be24ab50d3e314a46827c96354ec1c4062bdc17109a257e571adcc4a49874e82bbb203ae326f611c441dcbc10a19e137ebe2e194a8c655e6eeb6a934aff164c9b8c566d1bcb60905a446b8863614972daa172e97aaac18e89d9e7f42bcb3781fe67a0dae6416383026095d5adbd15dd2e844d9435ddbd3a3332020723a7d583b6d46a8c00a3d356928ccd0","sealed":"8d1a6846f1ea6fdd4c04c757d88cc2fcda31eafdd107f1836d005fa6e7cda14c8a5cc0e09968db5aad4dd73de563576d21d64b30527c669f52f53df900517ad38ca397b38d9ef96647f1e9c4398dbb7695598a3943a3ff2fd00f7a4c75926c8ad1eb4ac4cbb81a9952cbec636506a8d2c60ca29756a383c6b9d6e8388f9ce86f6ec59fd041407198700db8ba947d6d82c861206a0d80afac224e02c5b70312ae5fc5c8d922a7512dff1d5971b50967b6700c8fbe90ad2b242af24daddba4a834d38aa9c6c4b2e2a2e4a6590d55dc413f0548e328f28ea630f2e27554b256c1bb1a22878fa0b96bfa88d82bce0c1b9a55"},{"id":"g4","mission":"garage","title":"The 121 bus","ticket":"A Bus should honk like any Vehicle and then warn about the doors. Line 8 asks the Vehicle version to run first.","code":"class Vehicle {\n public:\n  void Honk() { std::cout \u003c\u003c \"Beep!\\n\"; }\n};\nclass Bus : public Vehicle {\n public:\n  void Honk() {\n    Vehicle::Honk();\n    std::cout \u003c\u003c \"Doors closing\\n\";\n  }\n};\n\nint main() {\n  Bus b;\n  b.Honk();\n}","ids":["b","Honk"],"hint":"Run `Bus::Honk()` top to bottom. Line 8 is a call: finish it before going on to line 9.","scene":{"decor":[{"kind":"vehicle","type":"bus","color":"cal","label":"b"}],"spots":[{"id":"s1","kind":"sign","text":"Doors closing"},{"id":"s2","kind":"sign","text":"Beep!\nDoors closing"},{"id":"s3","kind":"sign","text":"Doors closing\nBeep!"},{"id":"s4","kind":"sign","text":"It never\nstops"}]},"steps":[{"line":15,"ask":"What does line 15 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"2923cf2f9a19be3bb77856011463f10e960d60adb36a004bdc206b47792a1097c814dfdfca8faf14332277bc7396ed5796d4aa3d75add2e8a569cbd875a4e11c72478ec6bafa9aace4945f18bc91c3c356f8124ead0b8f4b563681c564bb7875ee392b8ac5d5fc658cb0977db616c8f315670a049b30584c29bf246357f75117870df6a0f1acb2c334bc80","s2":"38f25653b0550b8f4982d5873af4df1aa4b75fec650f4397edb1f3a7c3c7c6c4e65358f5b8c19540f4cce4f5a802cd05f6a58f33b46f16bd74e92483ebf5ebe5bb01420ad1e1864e17e812f4ced0a6efcd656b57160ad2e1422789c784cea738ed0dfe37ca","s3":"bcfbdd183c758b1c4f3584df2f47bc54f70380e95b1fc54de479daa87e975aa20d1adb5bbb3d9df56b1487336b02395d1db90d2e4caa662ae371ce41f227ece00096e6950fb9dd9e0d1eec24169719afc38e148b931f1869b694ed81ed46e8ed644e","s4":"c537caba8cf89ff133c14758ddc4efbaf84ed8b3fc0a5ad5740bdaf0d47236f890045f26163b65f786a292c36643117a7c621a5bbdea18579465f5e12f8a7c76026a2b653690536067f74f3d131370b747acffd687b98c135195f9b1513ad751967c9b1aa5e081ffb29b38009c0503e35ddcfa33a7a3c39830122c"}},{"line":8,"ask":"Now delete `Vehicle::` from line 8, so it reads `Honk();`. What does line 15 do?","options":["s1","s2","s3","s4"],"sealed":{"s1":"60974777205f0923499c574aed47220654b42523305cbd4db7876def37fa7017e7ee7e4689dc467e832984905151e1dbbf0b7133ced9a18b77dfef798af514d0199c0890453f26e39dc1653171d5ef56c1ba30a2cffa50957451f16712bc3236a4749f6372195c368c","s2":"0823080db895bc7c5055d3f6ea10deb9f4671630c7e0699702d52aba206515ed784fb5044923f76915f7707b747305036e02544646f04243dcaf24f92ce80e6de1f60adc9ae4be1fd39729c4a80efcfe6e6f85ae9827c30b03b2f6b19fe77598ead814b9995b15a12e010d73ec85b188c3335a45cba654cdfe0d","s3":"2fbf7422570fe1dabc6a1c5901452591f3fb748f50b60cbd0f5639faa94f32717ed7be4b4c2d3dd88b5e88060d66916518ca269695a4c2a6871d92a6c8a0934ebdb86e90240794f4bea9a4d43f25f46bf074a3bc0411e94aa37f047112bcd1244bdf8d2faea9ba501809d0e114a345cff091d2","s4":"4e4a1cef1443b40c06caf2fc266ea2910f9498aa2fc357e1f744dd912096ba2c32929df88314aa71ea9283ca7334b03da93b43a361aa7acd1d6ea7b6499d593a9e6d4139e674d6e338bd06e57ead6e1a923f1c00e0430fc419ed192f7e1d854d2b2015828fc72bade4aaeaeadc2f616ee28595d7f7dcd65faa8cd226745c8011976a322d29bb114b604eb79faa1298ccd67e9de7a1ff265b4f0ff5f260063c52affe54950cc5ea29ea7cb6e1659a3878f38857b4cfc58fc9dc934056ac74da32e19f55846584e42022160e6006890bb558fc54380697ed12f1f2f2d5eb0a7e71b5c1507ac1539cf377bb59c52f7447a33b6276e1637a93e2f3caf73800b48b2a92a2f570866efa14d045978a5bc0b55049f23efe51"}}],"go":"4603a181354571f7a4b6a52d5e41f026bfd5627d4c2ea658e576844679b9925e1a9563921105dc892d3c0fd2243f0772443768bfa487f1c07f408ac9ed1e68da1b0e205791cf5293cf330859b651c28b46b8309bddd2984237b8bf405cc04da13e10eeb2fb0a467e3c65f542ce303fdb97ecbd74dd8378","sealed":"22948fca2e37013fd7372056fcdad17c1a8ce09d85521060bdc277ab0971e9a7ef583e8b9a829e09656b7db8dbfd4babfcb6a48e88cb9b01732c49b0e039470b65777f9fa2b8ab8f5bd9cbd795d7da92cb1c1a0ccfbf5108fb2491134894bc89175ef63f4e0c3159528d6839a07e74bfee36a604492a156e74b4a9b655dc26aeab3f61b48d78af276b8a50a5184a229b08878c1307e6edd039d39163c6589ce56ac505acc21b7fa3dc9977560a0108ed38f7ab63ede7715f4fa958325cb4a43495de04ca342f91e6b8a60f2226"},{"id":"g5","mission":"garage","title":"Fresh off the line","ticket":"A new Truck rolls out with a license plate. Both constructors print a line.","code":"class Vehicle {\n public:\n  Vehicle(const std::string& plate)\n      : plate_{plate} {\n    std::cout \u003c\u003c \"Vehicle \" \u003c\u003c plate_ \u003c\u003c \"\\n\";\n  }\n private:\n  std::string plate_;\n};\nclass Truck : public Vehicle {\n public:\n  Truck(const std::string& plate)\n      : Vehicle{plate}, load_{0} {\n    std::cout \u003c\u003c \"Truck ready\\n\";\n  }\n private:\n  int load_;\n};\n\nint main() {\n  Truck t{\"7TTN121\"};\n}","ids":["t","plate","plate_","load_"],"hint":"A Truck has a Vehicle part inside it. Ask which part has to exist before the other can be finished, and look at line 13.","scene":{"decor":[{"kind":"vehicle","type":"truck","color":"citrus","label":"t"}],"spots":[{"id":"s1","kind":"sign","text":"Truck ready\nVehicle 7TTN121"},{"id":"s2","kind":"sign","text":"Vehicle 7TTN121\nTruck ready"},{"id":"s3","kind":"sign","text":"Truck ready"},{"id":"s4","kind":"sign","text":"Does not\ncompile"}]},"steps":[{"line":21,"ask":"What does line 21 print? Park under that billboard.","options":["s1","s2","s3","s4"],"sealed":{"s1":"372dec94266edb28e5f344d4184bcd88bd9130df6c50f141ef0c0ab5dc52eaf7f19ffc4f46c1420c34dc2375b4b1726a6ac184fffede9cc09c4a93cc3fe1c1c8be59e25279b9126c09cc9a89b0659cbb8377fc6e641b66a030a2194b1a3b753ee7f9d4da49c952cce598a454a52f0e763b6156b9993c5bb3f132eafff27deaec96b806d1580d6c4b6a900f1054e697917b","s2":"4eaf505d0e5fb2729e379c1df6125c577a1f4bdb92495e8d8ec9994bb0ffdd2d51548e44d03bc44d32acf2b069287fa9447758dad38342f625ba7b9172d6857989bb71fcf42f","s3":"73ad992a5202c6798ebd8df34515af3c8ea4f12cfe851efd7084023d806387c0288d411a4cbcb8ec40ee3367a081355dc94a8db3802a2aeca170e3521bce385acfbfb705f3d320e5d95f4e639b0badec1d5d83306f33f45ef1b1a069b8706c915a63823a9039f1bfe807700fecef1a2d234fec37aa68e0cab392b60fb80251e4021e242553343ac245dc","s4":"cb3893f46ae3d8172aabebcbbe9eb309b267658d125dfb0388732407ca894fa72e24107ad51ab26b86a82900281ea3ba198152a1a68ea2f17abee24d789c9f18c95a8dd481faf9ff76bb2b3a01bc0ae171ca0cc6971b24250a2831634c031c47e29cbbaa761f795c902ac7700b7c6f7b5685ebc47d10b0b323443ea8b1a6cc"}},{"line":13,"ask":"Now delete `Vehicle{plate}, ` from line 13, leaving `: load_{0} {`. What happens?","options":["s1","s2","s3","s4"],"sealed":{"s1":"00283432bb17fa021be16c7dfda34bb3751dace4c124b7d340f5d5a88c3abc886dd6c52471939eaae2742bfbe27ae13e046aac6b8ee1489eb5ddbc3639037637edad07e23cfde39ae9412b5b6d5506fa6e05c1c20b2c2424ec646bc145724174f7ce0dc7b0ee802d70462bd8ccd5c50b3184a6d411738f4f17cb33a934","s2":"6c041f2aa416874241d20e8a17ad7e203ea86902dcb116c6f833e5941f0df6f2c9961a92ef0ac71758ae6958bb5282401f4aaa2f573d31dff29366d0e199e59bf7fd11581cf163c983da58385a0c8af0fd9831921fcfc3a81006cbb4de0778c0b5f2a8088c843ef8dc1d39ffd38b067452e659cf7f14","s3":"a2f47a7b1ea5a905a9055f1b59e800f8898a79612e652b653345e37f3dba60b925c9ef983dd631bb2b89e5aa4bd84a6949b18c594f5f2ef1fabbb484aefaefc8fe6c9a04a51bf6e184e30aaeb4e2c85fb3de2960bbf834f65c276331631e843d9b69182673c5e342b55a846e578c11483b6d1e28580819f9a30ae00726214c2be500b72ba3","s4":"5b9450ca985da2915018845ab7f5db7ec2d1e257b1e91925982c8ecbd0379fbd97c578d2f6c3a2f6c65d786e4a9298cc5e92527cc94c170e801c32107c56a72c5bc84ac4ded77f5c30a6b842c150292d62a2a7e59384fe612778680da82d2e02b6fdda122b78f4f61153607f682f0ac4df9eb9759cc2c9968f4dbe10c41d530a87aedbeee458e1147cd69e985c915c634cb033e92003d93c082f0658f7eb85d420da73c66cb4c4e2fcd451e8ad2d7c7f2a0e0f3ff079bfbc8ba25da9f18ce38a64ac1fe6f84288adc678f27b8c958b77213750c0b5b70822ec7db125087fe1d11584a377d503d798888912503aadbf4ec1eb062c4b3558afd339d1e904a2cf49d20aafc0cb87914008be7deeaf8b3c85ba43f9cd09"}}],"go":"1e31b8973f28c85cd952bac5181d2fc6cf029b631dc30e47d0f07d275240d8197913249e63a7bd257607d4b278fd1b45f186438822cac7211b9b724908cf48b82e4eed8a7bd8213fe248e9b27092a8c77c7e361ca7912fd8801498e302949ec3bc56d71610022420fedfa526a7e20301f04b1c45c5effe44","sealed":"9a830a1adb79c9fa37f6413228b55d14bd31aecee483ddc887013d50e399903755dd8a521946fd07cda5d6f32317b4109a4d7a59fd6acaa1a2b15e4cea6fb8a9c7cb48d1d8c6495670883651cfb2290a07db59d155f28dddcac84653c539fb5f0fc22d247753491661dbb27dd21e4f09ac329c6c443175e691bdc64904e7f837bf818d8b638a8f779113e908ed8ba9922e671957eb2f43eca958fcc4c434410847c069163baa9940aae56e874ab50c5d291b2a4cfd94a65cbc31bd4325af8914b9e783d274525bc1d10b43a953e730f21774aecf5fbd2038"},{"id":"p1","mission":"courier","title":"First delivery","ticket":"Each house is a variable: its plate is the address, its mailbox is the value. Line 4 delivers a 99.","code":"int a = 12;\nint b = 40;\nint* p = &b;\n*p = 99;","ids":["a","b","p"],"hint":"Line 3 puts an address in `p`. Whose address? Line 4 follows that address.","scene":{"spots":[{"id":"a","kind":"house","name":"a","addr":"0x10","value":"12"},{"id":"b","kind":"house","name":"b","addr":"0x14","value":"40"},{"id":"p","kind":"house","name":"p","addr":"0x18","value":"?","ptr":true}]},"steps":[{"line":4,"ask":"Line 4 runs. Which mailbox gets the 99? Park at that house and drop it off.","options":["a","b","p"],"sealed":{"a":"20486e1b0d1b898af490758e3d2562b712a2f1d960d64879fd1ec60b236ac20783e8c4b97e8368b64da8c28eadf07cb29e0045b0278478ee6b8e1921d330e2f5ee32bf21b408dc3614d0456e6a8424a21878884743880cebd72dffe8312ba9041033221524c77508237fff436f7861b823906492f0d79bfe596f459bdf0cc4e25813cb53761dd9db12f13e","b":"17ab1745351638d6c5ad48cb0b73da7e56113374fb553ca9d9b3f37dfbeee82ffd09923b13c0e3f6457a7ca6488ec1056c0646fd632ebc641a61b02cf8d28729e1488efb2f4ae3c40a974a0e53ee9635efad72321a0d4c879cc83e796761663e8aba282be086e2d9653495578e680a9d59db0d2a531469f62a75680e5372de5cb391abea2a84c70150811166d13623cd32e9d96da9cd4856b8dce9d4d7201ac3bda456","p":"b390e380a73b8c4d6595ebd07fa35892ce5b7aab46168b199e93f63e1fcf313feb4146df0e81fefdcd48bc327c1a772f1b2ac65e119d502860f15d68eae69a03fbc2c42b514fc959c04a9f2e0659486461ca6fbd166be96dc3c04a8e304fd3791ec6905af06f3e826dc988644d49717a62f733b03e8faab5297b2d730e0ed7da5c5f3d0d802f4a77b033dfae91225893f59415cc22483503a46c7827dd712ef7c8e1b8ac6d5200dd2d62853338557b6527c9c5c40b14eb5371"}}],"go":"82ec88bbe0e17884ab60b5208e28473bacb8e3163f397987014df23254478350db6e7a94b8be3a819302213f0e2fea113d15040852ad4312ddc09cc8d49b54e710f4289265ea9bb2d4b319ea158892d38c","sealed":"74ab29b0ef5aebf2addca59e3e6d93d85e5b465517fc760505d8a69d46dc5644d3ad4c5355f454c0dc571e4a783f3fbd549fb636c2e87785fff25ab4c748cbdc408c2850b59c2c188a2e5914ece322ff832f97140263b85c7732daca9ad879aa4e01575a935a95cd66869c7bd234e9dbe995e17db44824bd6b5db7717e401f2e3b5d8dcc9a7714961b7e50429cf4cdd627528ef04d76095958d33ad6e19bd30bd7ff2dd7f54862566b1ded5a1da879f43bd146135ee3"},{"id":"p2","mission":"courier","title":"Change of address","ticket":"Two deliveries this time, and the pointer moves between them.","code":"int a = 5;\nint b = 7;\nint* p = &a;\n*p = 20;\np = &b;\n*p = *p + 1;","ids":["a","b","p"],"hint":"Before each delivery, ask what address is in `p` right now. Only lines that start with `p =` change it.","scene":{"spots":[{"id":"a","kind":"house","name":"a","addr":"0x10","value":"5"},{"id":"b","kind":"house","name":"b","addr":"0x14","value":"7"},{"id":"p","kind":"house","name":"p","addr":"0x18","value":"?","ptr":true}]},"steps":[{"line":4,"ask":"Line 4 runs. Which mailbox gets the 20?","options":["a","b","p"],"sealed":{"a":"64b39f9afeff5974ebe5a135b094176101c39649bcd151e213007f26fad2426286291881e8b3a795f7625f51acd47b7f94820c80c1ecadcbdb77b7d09c0031d3ec03a9a2665772a7b06aa9bf8630ee647fe68b87317adddaca897dfa2adea7e54e2f75e31f397b5065b3204da3404462bd5ed75f2fc416ffcaebfd","b":"1fdb4e097b2e0f9cd326ae8e759bcacf5041d073b3aac696d07bb4dcbcf186a94547a85c1008f533107aa677ca2b9a706ef6f28353fd2214cb60f8590319001db067cdad83ae158bc19309ed6e3285fa3077d129547ab4cfb0ec6c73","p":"a7b3efcdb012b00dd7904230f74d954d744b5993a79ebc234a1e3ec5370e6929b2865ace3146128e57cb660df50cce38eb65e8a3e67da67688a9add016eb30080efa262877cf737576eae75312682c791a82f8b5044662a54c385b45a92bcdc0b34acbb52d2c4d8c17f4ffab718b01ceb9d5dab2e6ecd8bcc57b13018d89f0ceee8159982e3e1276cb4c3195e425d6fcbe90503880fdf9075079ed56d190c6217cdacde207d0f232056bf5f58906241aafa7fa2d90749a1352"}},{"line":6,"ask":"Lines 5 and 6 run. Which mailbox changes on line 6?","options":["a","b","p"],"sealed":{"a":"6314482749b0f1ceef5756bd22df0b89d4bf995d042c034ee2a0247db0af33ba1626c4ae28785a9e3ee04002c04332cc8cd52f3317de1b70105a845d0ccedd64fd796c5b7052f9c37939f384082f4c60d19380cf9b2b77","b":"df15682beb484750d28bde94503598eb9aa479e5acf04c6c0ded1a081f5a29f7fd6b3d095963c16ce7271df3af9369e8d64c78c2d3aa8a74b4db8686e3b17ce642307f3b4f850ef6048c54a86231304887a534eb76aa4e0f2b1e5b709201fc4b1a056c16e640fc4ddec74ca27a494691fbafbaf0937abe41b8c60f03fec477e64eb0aee4696a65c373c9cb12f94cdec5081de6d14ca3a6197dea5b32e249b7b426e6d1cff3","p":"a2cc8765416942a8e27fead7a96132d9a1181543a682b5505f9659f640a0afdcf345af21894b812b7e045153622733524af3f91aa5a583044a969ab7bc08462ea9b4e2a808419f46cc11d5a6534cc1148d75ce8947d8394c48026cb01055b40f31db78b6a0dd799caeb69408ab35750aa4f40549f58cea4b8c47bccd9626d2e44f1159d62817bfc1925d49f94ae78304a4c384901b6428c27ef532b9754391f82f90e6ccb1e142e04e98d1f7bb229bf56cbae685ffe27e24c3"}}],"go":"f5d301d6add8bd37043b7a6cd4f22b6a7f3e26087335ed4e0cdaae59d90a82add4aa991f92bcb53dcae888773e6011badf8d1f52383c8235ef19b894d4676b38f162a726b1d696bad41680ef261a3fb6","sealed":"9f27ce766866483385886cd847c355b93458a51caf6a4ccab977dbd0eba5ec90d4fe34afa5036bb185a4c599f42f1bae378eb76c5094fa1c26c3457a292e23c817041e9dd5a3b7868c03533dc56a0b838f66343229611cc622547bccdc9435d5ae8515b5476ef7a0fd2310f4669a496313ec99bb25402443a59deb2e1c59038afae201c253833aa6e847bdc02357f395bfca46b74b890133916f175557d3e312ac6698ae15dc"},{"id":"p3","mission":"courier","title":"Two notes, one house","ticket":"Two pointers now. Line 4 copies one into the other.","code":"int tips = 10;\nint rent = 50;\nint* p = &tips;\nint* q = p;\n*q = *q + 5;\nq = &rent;\n*p = 0;","ids":["tips","rent","p","q"],"hint":"Line 4 copies what is in p's mailbox into q's mailbox. After that they are two separate mailboxes that happen to hold the same address.","scene":{"spots":[{"id":"tips","kind":"house","name":"tips","addr":"0x20","value":"10"},{"id":"rent","kind":"house","name":"rent","addr":"0x24","value":"50"},{"id":"p","kind":"house","name":"p","addr":"0x28","value":"?","ptr":true},{"id":"q","kind":"house","name":"q","addr":"0x30","value":"?","ptr":true}]},"steps":[{"line":5,"ask":"Line 5 runs. Which mailbox changes?","options":["tips","rent","p","q"],"sealed":{"tips":"5e17fe303b4be901f528753240b53b023d2f6d14eb33b1be2b82c178ae157543a9d860799f07fbb000a373eb826ee38885115f9400195de96b8eee12585d54d7e58ecfd47411c1843f85ceaf930742992e5555c6c2654592123e434da8824751cd4204acbe4b6dad4f1ed153231bd0c494677e5941a6b0e43bd4d434bf27514b6f585612898f96aba6f5e4d37dde3eaaf46b3a446ffe023eb7f4de96b9fb62073b280787ef8d4e0d3dca2c338dc20c1c86ad556be8f752214525d74b617121","rent":"d6da7e63c85c3b64ed54605ef5c89fd7393ed280069b79fc48f203430318d079313c4347d8e3eba6ad92ae30961946e680b1561a812f20dd091683155ffc302440ab0e41056a95171befb9fe5750985a7d5fbe136348e47b30d6658b2da1638ec9dccebd20f85ac95ab11ff70d0fe3456532d81dd4a6d240b8fdfdfd611e20bb6d2de0f0be3a","p":"898f5fe80ab734abc5454f4840127cb901c369b6bdc459779841900f73253e819fad22d347c53cfca1e7fcecf9114c725fade4b52302f1a2c957238284108bd6ee6211d477eec4387e2df081eeda2e8e9001275792cdf3295e03ea46c06047f7e6ac14463de336d24c324bec8f2e556206a5cff1b9eb95ead49977bb6d72f689b80d442087b41ca37faa94133beae24690","q":"c7dd61fec1439b9ccac74b04663a7e4bfee296230e783ef8ba18034905790ea52ab0ba31dcefd7332215d4767ec38f861d1dbeb3f34ccb3e688bd5260e38c54669863d5f20629bc359b948a199938a2d5891b80f39238b928f3b847fb358b63709b80a31c74b6b2e06bfc5f1162282dd9aa7f40818d8fc0df27e3d0aa254918df6df86b76946cf193feaf40946cffbf9db15fdccbe073801e3ae1750fd1758dd3eebdcbdc28dae137275b96c7e29f9a37f4120250ba05911f8"}},{"line":7,"ask":"Lines 6 and 7 run. Which mailbox gets the 0?","options":["tips","rent","p","q"],"sealed":{"tips":"00e5d785fadf8b6a7242ce23a8b1ca226ffda627b1bf5105bda61ebf1c90945edfc217fa18f45dea2e1283138151c777cfd408f11ae07f2d8c6661fed2b99420a304b7180410997d9fe0c6c534621be4973d528f23ae9cc80a7cd9aece793041280919caf24988ef43a47dd8b7b09b4ef2b5d9b8d0c1c9169fb74c81eb2ff97ae9f1aa1f45ef8e50037f45a998e6bd84bdebcaea2130d8d93ffa049c654888cfe83e482e1e1ae8cfa50e9032fbdb82c0ad7621beea6ddc2d","rent":"3891c013103fa25a47451be90f63787ed137854ee15bb186ec99cef6c9dbc2c3ca7ab1dcb55cfafcb116c1ae69a2e385c17add0ffe5ebb6ae2b3456c19dbd71763eb9514d9c1ba5bd046f30e692549568d01113d42a2732aecfba6a38cad50e1a8d72fe2d2342248469c29e4817622503576769e9a81e938a206694ef720","p":"2c3901ba21f37b3e90c6aa8667083c7115e02f8d075ea8e72e15fae6d5063b0dc1d163ac6c01588913f791c1c8bf31109db77cc00c9016afb1c1d5b18351b65e264105f247de94ce648613cec0e7e4f7450c11aa795078d23268a77e1294ecf24647b0fdbfcabe8913649e93cd44c8e47c6a3299ead8da17f0c3d41244b6d184ca08ef34a18544ee7ead4d8a6012ecc5ac6c3dfc29796fd4304ea4b8bc5307974f8958d7131c3b90fc2ccc10da10a415b24a79f5efab57f6de","q":"2ff22f9c40ddc38601b068a121000e0bb710e9e4d1af565b4243b95141c7879622b398ffe741a4a1ea34044fa718af6410fccc3939309037ae83afc16f923e81d3129b8a5a6bb57700a16da469d3e55cf5659059f501b77224e0427e738bbfc6ec1ee404ed1c61"}}],"go":"79c0f9799e2e15d73cb3f0942ed77f7a4c204e4f0de35bcf704c5fb55c8ed7c1694eedd5f3fc98339e31c8c5b3babb4456a5339a50257c83d51509e8e3d5818fe177b2b0b9ea7192107e4cefeb","sealed":"241b000861771e7a4da3862284a3e5f82b4628e503e910c6a04ed1342e60e7175003a674208b16dc4c1d7cefed80e30465627db7d256de650141efa57f66befdbb725eb7310ccd476f14ebe4ef92e6ff082058eb22123dbe0a332a5afc84ff70c42258524de966956df4e9ee4773c8028e2470a41b2c1eedf17b5b8ba0f097d4352750d841eb1f2a574de42b332beb44de025a89ba492e59c952e1b1c83dd1e5527aa1e6"},{"id":"p4","mission":"courier","title":"The long route","ticket":"Three deliveries. Watch which lines have a star on the left and which do not.","code":"int x = 1;\nint y = 2;\nint z = 3;\nint* p = &x;\nint* q = &z;\n*p = *q;\np = q;\n*p = 9;\nq = &y;\n*q = *p;","ids":["x","y","z","p","q"],"hint":"A star on the left side means an int house changes. No star on the left means a pointer changes and nothing is delivered.","scene":{"spots":[{"id":"x","kind":"house","name":"x","addr":"0x40","value":"1"},{"id":"y","kind":"house","name":"y","addr":"0x44","value":"2"},{"id":"z","kind":"house","name":"z","addr":"0x48","value":"3"},{"id":"p","kind":"house","name":"p","addr":"0x50","value":"?","ptr":true},{"id":"q","kind":"house","name":"q","addr":"0x58","value":"?","ptr":true}]},"steps":[{"line":6,"ask":"Line 6 runs. Which mailbox changes?","options":["x","y","z","p","q"],"sealed":{"x":"b56c6b3f03b0fbcc99c381aae5616d87170963f1b45a0f861232b628a26977719d0c62fd9ff6c26271cdc71e9961e74882f8e09e7134c5a65957e15895498a762e773ce69ed33848f1faf2db554e6843d6799c02374774c3701ad463d13c5e269ed4fc054e44250113c3bda21e16823c2ecf364d4147b4ffd68f7709b03541c63aead29638b12c4d19e2351d66d6efb134573014a0fba08f146ebd8ab924dae32beeeb781fd1db","y":"85e25973272a5b44755ead1c60877a9830381e13e58c49e0064ebdf208db6824abc97cbe13c6d21fc91fef17c7c978b1da85a911a7c2a4892a49a21f81816fad027ac668362c4b5e61f02da1af21f71204e841bb558c629a42ecb6f991af195f28efefdce346fec1","z":"2ae95c0e8a69d572d6dfb9252f89024a3c42cd9443839b9de64fe7a5b6ebcf483b1acdb39cf267b979d5fbe11cf9a62723b1f64ff82fbfdce61e48674b3a6e957ae85266bb32056a9891f806f6c1bbf697610725d6d49ffa098cb38a1f3b5128217512bc13106a7cc202e4b5af339deeb79b640b813c7ad159da5ced9b3dbe4bdbc5a41edacf4787a0efb738","p":"2f5b2531ce4b9fe1138ebd5740f637c6726f597b906e0d64c4a7f6a762288ef7893803afb47b2e91ff49307648239fccef0ec0914f859711bd9058b17176be76d8e2f2ef4a70d251079a556a326b1c4c20b64251f5b7cacf705cf5c77ca8b215064c2326546c14080c6fa0529b58073bf25fe209bed1e6975625e21cc5584ebdd9646d5d864cc3613e97609204eeb1e9c47099","q":"f35aa8b521ce6cb44582934949f0b6afb586f284be4630712898ea34ef7e64cef44c1ab9ce7f6dfb6026c7f796592a3717bba751f03dcc8b725dd4274516084f38dc68cb6930ed11bcdf0d0c42181f371040e5bee77f736806f5c1b6f338e1668104ce205ed5a79f6bb22451b7b7dac0a99dc8ac23ac452de363d52eb4edf617dd18d848f345ad7d7d"}},{"line":8,"ask":"Lines 7 and 8 run. Which mailbox gets the 9?","options":["x","y","z","p","q"],"sealed":{"x":"4fc0fd39d7e159d104e1bd49daa56b863eea3219f888fff660dd30557a705c4281279dde8a43b2062a48073bdf0ffdcb4930c6e11bf4b8e4d20378793ef2223eda94c95024778959bc615b88971da90cfac49caa013a6668aa420b756ff468e5e97edf2ff75dffd796fd7167cecc95709aa5966bb1e2","y":"5d4688cc3a347393b98bb0b781440cce4eb98e1eb2af512022573b4d6ccaed0a327a83a9720efad6e8dc3028c0c5f5570b973e3f390e6c116590856a8aa9","z":"9d10487e2d93dd9f10008c6552ca3292f15e1285183c4196de2b651184ed6952244e1f09b4f36551ddeeb5ea597bddf3b17a85f4f2e50f505073ec0f5fa01f68ad49a3dc87444df4c3b5dfcadaa62f0a3fd8c841f85273d8418099a2367bba40f921d967c6ac0ca23014284cdb2b10a444073b51b4f908fa27262d2731a0dae85d2fc3ccb8dc8a693a8b5d474a692767b423f3fbc44072582173985e158dfe212bc492ca2fe915aa061a20","p":"01c0bcc472cdeae8fc2ee24693ba8c2fc63ff1d31b62607d1210dfb1c7fad839e1459eecff0ab5c0138f465635b50076876e2a05bb1b67d3a446514628a27e1dec1b0d70230db27c3ac261daea814de26200ffa09f32cb5aa4c62fad43493430b285f6985c51df72ea5fa6d412aab8d23c6d6227416a085c67755e95cfa810ff780710fe972294411e770993bb6090cd6b4d82738b51c078ca57fc6bb7d60947f39d6ee3c13b71dd7da5a7167d516d51c0446fb713103e9131","q":"f5a3eec8e248f58b45dd478bf1940ee793a6c1e4d8bdd3c82c5811214b6a8887ad170fb493bae4195bcdd11fc9bc8f29929d0afe6700287917bc831a4178d1577de71a09f3b7fdc0d8f943f75507d5bab13b2015798da85a071912e86a757aa1193c31fb64cef8ec1425c5e49b68ae8db4731c4ba9592926e13c9c333cb1e802"}},{"line":10,"ask":"Lines 9 and 10 run. Which mailbox changes on line 10?","options":["x","y","z","p","q"],"sealed":{"x":"0af9da8d138a5382a0366b7c583d93860b852d6b4789e20c2c82e4f25c01ad19a830fc557e544d13b48fc2599d019086abb1bff868e19cb53b992bb817bae978cca012c3d904318479bc64","y":"86e17f42e934f15baa0f5ab8821635ea5f78768e8afe4cd82fbd38fb5ac3617458c1a7b93519126571f8b6f3b0e40631906c6fb87e4b8bf1472df2934a382c12dad1e08c6a218ec3bb8a09a8b1ecfcf932b2edf013e6509b305f72ee5c0a986f082ceac7af957c7125ab31a71dfa17bf751223f7aa0256ce1fb71f111ca588f5e9bcabcf17f93e4162db2476f5d2d4fff750","z":"7517f02a3a3b72b9cb880c12f323c6257118d87b84d904383dceaa938b8a74478e569157d65c4d26721a09750982bebfa946e3f6106acb5d0676bb628f1b1ae2dee6127f772f886498bb94777456e3d6eb6fa8b522f6894488012b481a6f43f1e8a196f43b81ea792a2c94980f090b38ebe405de0010d1","p":"65f75c5cf31279a35d2db33a5a5660fd7ff4d2303f93977f7eed87fa2487125b54c09f1b650f57a0c073a354bae7742c4b0799596e035f3eb67ad384ad0f8150cd9438b99f3c0596a7c11fc7c84db6c0","q":"4fec2adcd72b58dee4063beb25448d27d0fd6cc548e287fd3b3aa29da4c2ed684458f106bc8c1f8a4421e3d76477a68cb6e1e905fbf333ea0640288ef7d4ebfdb1db551f34811fe889692d8c03d74e3f57b9b37a181a0ac031872f48d70fa711979b516842adc313766ad891d45eff38205755190b8df4ec8a719f87ce3dff43dcd7f04384e7b38f22b2a183c3c4170c7e6dd88aad20dca4ec88dd4d4e3d5eb9b5480a69438554a0a7e6f6e846368783946cd76045a577dc47"}}],"go":"6a4dc9557afad07ab84a9a2c9c80b13366b309be0c4cbab8de500224160735b778421294f99ddead78542533a9dd21b7ebe78fd7b67155f7ea2a492baac9ba0c02c9d8aa824b230d6a30753e3ceb8bcf9799b7fcd4f23deb","sealed":"3073cd699581711324b3fe29f7843a8b80c39de9d68e007bf608575238b66418357a0e9165463090ccf6c5c6a3ba7b91c2ed62b45f69bb19f25fe31ae67fb84e2521b1b9bc39e31c77f9fd1062d20b12d494b9448ea7ca3899ad3630a82204fefb32ad55bba605ec9b983033431c949c929264d22dde11a2badb38bff637feaa721ca1"},{"id":"h1","mission":"impound","title":"Tow on delete","ticket":"The name tags over each car are the pointers that hold its address. You are the tow truck: when a line frees a car, you haul it out.","code":"int main() {\n  Car* a = new Car;  // space 1\n  Car* b = new Car;  // space 2\n  delete a;\n}","ids":["a","b"],"hint":"A car made with `new` leaves the heap only when some line says `delete`. Count the `new` lines and the `delete` lines.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a"]},{"id":"c2","kind":"hcar","space":2,"tags":["b"]},{"id":"clean","kind":"sign","text":"No car\nis left"}]},"steps":[{"line":4,"ask":"Line 4 runs. Park behind the car it frees and tow it.","options":["c1","c2"],"sealed":{"c1":"221ec42ec75be741c33560d3c03481d9989e27065e665078f98e696987205709e89d4d6add0c1c5263580de76fff3eda911ac8d851ca2dbfaea3c7dadcb31dd20dc92516c987bc1d3a09d2fb36e8fe7ea1cd45ce78bb45593b1268325354ca38c30d0834fda725aa82929d7c2a6a0573109e17","c2":"e4db7ea5b7551dd56c928b7cdcd852a1ab61550f4dd49019f10ffc9126bd871796f93a1960ae46d8ba4f0648380afe21d2550ed8dfa8cde13187798cc649a3600b1a183307549f21aa42f806b6904b91110a7098eb7e3edf3e38319e90b7fdbfbbe1cc1c8e88443d"}},{"line":5,"ask":"The program ends on line 5 and `b` disappears. Is a car left behind on the heap? Park behind it to flag it, or pick the sign.","options":["c2","clean"],"sealed":{"c2":"dfb23d03ffe9937331a0dd3986e5b20172a4fbce7c8c7e8e703f8b78700fa2f0d2a9462ca971d5c40f9c3eda5da03ffc8cb5301cdd736cb8823487c70830af986cc47778f43a90470ca857dba68e2d5ca51cd06a736ac11b53dfee976cd3891fbb80c142eb894a08141aa7758123e6829e9ff6e61840274f187baf65f55b04280121ef82a56911f8f6345800a3912811914f2ad175cdbb39fe00f922eb02e1d155cec7fa705ca7c804","clean":"9e8a227d80b194154104f4149993cbbcf8a451134cb689b8ee0fdc734c64c128ab4393b709ec177a3ebd208e257d8fd11b69e6435655382423cc4dfaf1517dddabeff2943e46d7f12f11b93ec5f9e660ac34c432576f820faceea11aef3b4663dd3bdea2b31363b0aa1571581b8ab6a0d31608ea5a28e443416254b5b8d82926769cc1948ccf254d789a"}}],"go":"65699dc28bce167ddf995fe8d0ebaca3bc57839394172a7a6d6ca773c07742e8ae4318bee86f216c4fceb9fae8cdbac86f407b552c7d4c41d796ad666fab74dff30c68e8ca74aa2832fcc06248df28a431517c8f29d39e57378d35e3c065032cc2cbc8e3","sealed":"249628db0e00da35fbb9d2ba6d0a875f6d80441a83ca188986ef539f76f1a7fe816d012801d4c501c77a8069ad1787ddb159262f391e006ebd387641b06c8041b9703fa10255e9870e151e37981911225714a184c762960a8b264b7ef99670a9dddd6b9ec3761aa78d206084f8308d7a6b65de8d694bdd9021b6b1cb4bb398eaa01d8d656a6f9e260cf0b98c4f06cbe1b2b62615294d720c79c5c4c7d0eae8c1b8a1ca18814dc628df3c"},{"id":"h2","mission":"impound","title":"Lost keys","ticket":"Same lot, one extra line: line 4 copies a pointer before anything is deleted.","code":"int main() {\n  Car* a = new Car;  // space 1\n  Car* b = new Car;  // space 2\n  a = b;\n  delete a;\n  delete b;\n}","ids":["a","b"],"hint":"Redraw the tags after line 4 before doing anything else. `a = b` copies the address in `b` into `a`.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a"]},{"id":"c2","kind":"hcar","space":2,"tags":["b"]},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"bug","kind":"sign","text":"This line\ncrashes"},{"id":"clean","kind":"sign","text":"No car\nis left"}]},"steps":[{"line":5,"ask":"Lines 4 and 5 run. Which car does line 5 free?","options":["c1","c2","none"],"sealed":{"c1":"eeb4e002aaa9bc2039bc54b502c9598fec5584f1653b2995ac72e94ad7fe1a60e9e6631e6f3a98669a05afb1ba6221a2c4dfedd91950cd5e4ba813b3a9861838fb18f25bc7c99c1531815be189344fec4f942b8907ddc95c61c2a26b3f13b582cca4299f1c59da05e348cb88d96782c08383455e59d84ec9d5a358caab1dd53b69bd8875456db9be65e2cc95f38e","c2":"472626fee2a90cbacbf7be490f61ef0b869be7c0213e16c5651439a74472845b2e7299bc9abba153d1589e4e744e2104c97b86aa7fd2aef293480bce07445b1d661535c05096d8f6340fc4c630cc937aca36b1625dd82a41bc8894914a4fa7c73ee17ee186b2f3e5d0bc5b7bda70afd2deb65852e9c4f77ca2d8dc590e5281cabd2c87a7f0e708a9c4f458138da9f161fc5adba9cb5c67e07967853837f31f38bc6ad64601c5fef0b5b9dc657b4a79dc3c5aa61db97243","none":"c6cdb24ac71999d136e07213c52d102ca0d294d2dec47ad5e86f52b9386ec9ad53220f90c060405e64bb6b3e0e8fbc830604ab2c2bbcea6fffe9bbf3562c0075adf58bcd9a211591532af2653104c61e4cd030c302a9bbc793db61b5d0adf682bb3059afe5a3d3fc3a12e9c77b920160ff6de8"}},{"line":6,"ask":"Line 6 runs. What happens?","options":["c1","none","bug"],"sealed":{"c1":"9805b983eb440f835d502569939f5f7b4ffaa5d1b990a937f70288e18c587e2cbd00a6170c2e3d041112d2910c4a3e2c5c76b212fe29b685afa7e6ddf802ea3f60305d75d4e18e0e56a9d182d1dfdba210247d0a314dc771da6ef344","none":"c995d39eb46ebac38624c3a19264c7b2d87bfa6ec3204315d673bcf1136eae4fcd15c14fac72b1afadcf34b2e122406c08b0bbcc7779fc4a9bee369d24b7501f3380277534d0213663e94622d27d827e93d01436ae5bea365836fd36d094fa98d04b6f639098de7646f37e7969370ce71de4492d0d8a81","bug":"40c092f56de60314ff35a0bc13eda8f17e7a02e71053bc20de0d6033d87bbd5756ed6648b485e3b1dd689a3a6bbfa5443b507a4f8c90cc843387f5e0237b12e4288eb52264d9d2a8b0a2b25e731a4ca7f4f548ec42342cda351da10d907e213ce29d2769614b67a882c136a9b03a2d76103e06d8adcba590f2644d3432abbe1287d8f99da1e53f3ac833c67d685237758bdf2997f803bcf9a2be0366b67561011496cb34222996a8b965b82ef2fec2ebbbecae64d0d63e4f4c26a678b2c54846d4ec66989d54d33d6423c4d9028b0b343819f343"}},{"line":4,"ask":"One more problem. Is there a car that no line can ever free now?","options":["c1","clean"],"sealed":{"c1":"e7165e4c4f3fd63df5dece7837bd0072762be37a806d3bb65e06624c159294c1e6c680f58a3672a0033f9beae1e38191dfd80f4e8b6229e95b93118ac9fc03c1bb2fe976c4d3b4d19eb386a4e6f1e9c1dc4c58b198686b33408e78eff7d68d44f094d5d9ea96ca60fdfb3d648d3e5147c0b4ccf8c9fc34cbae504f726c7526be603197c6b21b4e","clean":"ee70aecf94f89273a075c5719f1c31f03195272303a5015bfd7e29a9c69c62728077b7408d32d46a3d644bba9ff658ac4afd0c0bdf301c3ad76017a151d9119fe044fdecd029c5e463a40ce10ed0f468ad1217e6a7c53a61c51141261f912a8a3f"}}],"go":"4c359483d6213de85eb1de0c767d75760cc76b1b81db15bcca18c38799867e3e72e7e0857b68ac2b36765fdd3faf202cebfc79a5d387140173d02f68a3f982cf77f689851a9c235a0684dc105058b044c1b19b07ecd6","sealed":"b316134980cc5a0cea6f5c43aaa6e541934daf90fc45400d7f30a558c8d77fa6a354c09f6295391c414fee82ef46e2016733d846501289e3ab2cbd079f0b26a664540f8876ffbdeee32b83388f794929ff6c518f027f4e050f193300303ae34c690ba20820cbf6167f2c770358af0c5400737096a4aae47e0e647f44b7a5fa75b3d01e63939048473d8e49caadbebb5a0ac3670920e87f5bac134c6e38be52ae5670a593a1e613f4d10df3237c3f3a314da52d88581db5aa39dd"},{"id":"h3","mission":"impound","title":"Shared keys","ticket":"These cars are owned by `shared_ptr`s. A car is freed the moment its last owner lets go.","code":"int main() {\n  auto a = std::make_shared\u003cCar>();  // space 1\n  auto b = a;\n  auto c = std::make_shared\u003cCar>();  // space 2\n  a = c;\n  b = nullptr;\n}","ids":["a","b","c"],"hint":"Keep a count of owners for each space. A line can take an owner away from one car and add it to another.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["a","b"],"shared":true},{"id":"c2","kind":"hcar","space":2,"tags":["c"],"shared":true},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"n1","kind":"sign","text":"1","big":true},{"id":"n2","kind":"sign","text":"2","big":true},{"id":"n3","kind":"sign","text":"3","big":true}]},"steps":[{"line":5,"ask":"Line 5 runs. Does it free a car? Tow it, or pick the sign.","options":["c1","c2","none"],"sealed":{"c1":"3cfb8103f4c156d0f1647a208d94e659e0d790aebebb103b0adcfcb85c6da240962481cc9ef8a18b7b5bf7b21c97e1388fd7de3d12e9562a78a9f22d1d823afaa17ab531c12da5451831ca057614b7266e73276c49b48bab0de484591f32064e9b131d05a86ce3b958220e0ad6de971ace91803b860e2005d20a30b8dd","c2":"f312faca3c35f334a609a0f4af8b81d571902724319b05abf35d7ec2f8760b3fd4a188d95df57ad749db704677ba629bad815f3e809877e5c40b29e50a071cbcb0f31431216e46606b3c5a9feb9a26fd32","none":"8be13f234f93048eee311f522e76ae79f5b19d7457c32a362c0e775e51347ade69da9a86b5fc9ae3cfe447fc52edcf44f9620ba713ba08b3aac036a892bd2486cc7f3ffbe714210e2811ac1b873986a905181a2b010a9fc9cb0027c0791ac5b1bc3900d23ca37d039159dfb2cf9eefa65137374eafea7b9236e39f835d1d7c11bbd1b2c3a6587544289517c9e39a13c416d07253447ca30ccd3b904228078fd6d076a94d19686524a9"}},{"line":6,"ask":"Line 6 runs. Does it free a car?","options":["c1","c2","none"],"sealed":{"c1":"e6f57394dc83b296df5691b527102e2c1809f5579336a66a8e249c3c09dd5a3392f4574cae0776b8d8c9a3e3eb36646428e485ae20da767f2ce91b4ac739b5c7dfffbb2e7d0335220eefabc125b44e3df6bde90440151d1db6f708e7e280d8e53a8c5791e24eec927bc2bb81ac2338f5fb3b2caa9e9e3f135d3768607c8723609e9837be07c4422442afde33ca65443b64","c2":"7251a3e050503e9a7e5bca3317cd265821527f99fde5f5e8bd4acfbf0838a725c8f7be1522e4768afedd5aa761d29ba50ea655ffed55f8","none":"b2788b822984f5909e23ab462c42f4f091f79a7abdfada1077ea13a35faef8b28b30ecebd8f9c37af4da5f1e79ea0f40975b7c0c15fc48998399b68f14f6633b6df2b421a219a328298af9502326778cd6308171de60844ce2602c9ea1571d927a66fab3f2586da9b8e8033ba4aaa34eb5b35e41fb3ac04979dfb9bfee693de8ad72b6bacf99494c09f3c7a8809ebbf33e0547b426ca"}},{"line":6,"ask":"Still paused after line 6: what is `c.use_count()`? Park on that number.","options":["n1","n2","n3"],"sealed":{"n1":"03de2ebfb6a6b1f66b2b9b840fb40fc1389e6db24ae8dc9096d6a0dac616ba14008f844e13de7be26e2bd3fdf92a7130c1706f56affb20b7b129235daa5adde093576bf6cbeaf78141e795a53752f890186e5d","n2":"299715a1b8382130a6288b10392b617a5024f8c57fa0689b33dca7cb2ca15f17eb7947a086dbc713d0c1ea9b1c209737ca0d7252cc391a2e6aebf007ffed35fe5eaddb050848f65bbae83f389763d8f914061dd0292909c330e6519ad2b7cb7ac52eacf2db59a4c0fc0d168dbf32","n3":"e880cb83a668c7f295df33de94053ec8bf0468e04da16f7cd263e0c84bca4751ab1a96a59d669ccf10e401f26ecf2e55e7179823e8a350046f77479a071300220155a6bedecba4792159a5c35b41b3cbb30eef5d500c6d52a93941"}}],"go":"287c7f2c0e42e6dd13f8dd73ce7c179a4ee0d5295b9793679b9768f8bde680959ee99de8b4117e76a8f574abc7eb370f3c4a6c6cbfa24e4e80395b9d68e16ef9c26a5dfe834eb769625ccb94e98c485c5c6f69260b24e12e772d45e7679b97fd1bb5c75a","sealed":"ca962374e316589f6ef5e89e7a3f9d936cdb0ef7d80ee5be7f8f4eb7f92677b9f189276a15302fe9a31b49e6e93681d9a0a649f6188cf424ae9e136c118e1655a515d45489f3eb84bf4f6637a160565ae4234afdab9ef06522731b869bfb6eb55546f5bef8cb2c4a6c065b61fd11060795bc2e9acc3e726fadbcbc8ba78c1b01ecd13a65b45c0aba220df8045cb263996eb6f214cc53ce6c5d6d5662b5f12f34d5fd22c70520fcefda70c7be8379b433c6d750849a7d0f56c890457dd3a16af7ed2e9db69b2c42e0f2c67049b043664057c4e7549218a138"},{"id":"h4","mission":"impound","title":"The car wash","ticket":"A `shared_ptr` gets passed to a function, then the owners get shuffled.","code":"void Wash(std::shared_ptr\u003cCar> c) {\n  // paused here\n}\n\nint main() {\n  auto mine = std::make_shared\u003cCar>(); // space 1\n  Wash(mine);\n  auto spare = mine;\n  mine = std::make_shared\u003cCar>();      // space 2\n}","ids":["c","mine","spare","Wash"],"hint":"Line 1 takes its parameter by value. A copy of a `shared_ptr` is one more owner, for as long as the copy exists.","scene":{"spots":[{"id":"c1","kind":"hcar","space":1,"tags":["mine"],"shared":true},{"id":"c2","kind":"hcar","space":2,"tags":[],"shared":true,"hidden":true},{"id":"none","kind":"sign","text":"Nothing\nis freed"},{"id":"n0","kind":"sign","text":"0","big":true},{"id":"n1","kind":"sign","text":"1","big":true},{"id":"n2","kind":"sign","text":"2","big":true}]},"steps":[{"line":2,"ask":"Line 7 calls `Wash`, and the program is paused on line 2. How many owners does space 1 have right now? Park on that number.","options":["n0","n1","n2"],"sealed":{"n0":"fbbaaa4a73ec6b145e5c080db5e84f126e78adbe01daec6feae42d7091233c106d11e7d7191a19d024b264c4e550d1df0d023e945dd910ab1c371d1be8e0f191a9aef927194e923841929e5016a9d63d905db64a504843c7c4f282d173","n1":"917a5cfbb361197441feb3593a50781e2ab9fa7c6afc89dc12699c0c31bbb0c1ba54781ebd72ce6ce1fdf401a13fa6f3b7b1c4c9d7e12fc260f6553d8a33781e8034d30c8149b42a7b780b3fea032a5f428c83f3fa28555ab6d736ed4b2be7525697bcdee79c945dad13a7fc20c63bf983a1017277","n2":"c48e0a359cc2360fadea9180c98a5883c4093afecdfe08ba579a98ea59678e745f59c49d6965d65f46ab19256b020603da691b5c630d284c6d8f1b6c6fc3946894c1f46381cd2bb80066e11505d881b9c8294c1da4bd8dd268617c48c03527553f3974f6e2e8c214ee4f7f26b0417137a35059f4673f1303ceaa1350e72867b4bc5ef417c312a786f03b5a0c5b3e1666e6639407ad150f2939bbcd4d46b929c14a69cf85cf6559ba2cba"}},{"line":9,"ask":"Back in `main`, lines 8 and 9 run. Line 9 points `mine` at a new car. Is space 1 freed?","options":["c1","none"],"sealed":{"c1":"87e57beebc6d8fb5b832c0015023421dabd2dcdd44f8a2e0ed0b52bff6818aa065722b5b37b32a17f4b68d3063c888fd3b0a033667e5676529eb9b9f3ac4e16603a8ac130267759de27c71f289f47de1c53a4be427fc9cee938c263ba54fa0aa7af9d9577809b30f86f71b50ecb7285d753f89fbbf16bc26633c4e112bd99bf26e0a52","none":"81da123fd01a9c24266472535445e1f39fb5a262f3908e9db0b01bceb93ab5312054d9dddba384e682d60ed1e029bbb9ad713760e635b2b14546fdc207d0915732963b3532e639a2ff9739fd744f1d89ace5e9915753fcd199c54b919eaaff43c2406d0a28b85bcdf1b5cf39c137be09e4fa15f310cfb4583554662565f4fd9e5894bf8fa6b214d86da49b402b7200fc751b0b563c9e18269aa66ff65f58d5f0d6d08e85a45e7291c30cfd4770ea28779b8855cbe4347c4d"}},{"line":10,"ask":"`main` ends on line 10. How many cars are still on the heap afterward?","options":["n0","n1","n2"],"sealed":{"n0":"a9dfb48a1b2337f0647793157a7e9a7c85b15cbdf6761c85072fdc4c42729676efd912fe9d588be90310e7028d7afdb954631cdacf7006e3c3d9122661e8062308ce2f335bd50c95b9be5b45323b75928d8eeb29444b2dee71f6f43e4a3ea4807a7ee575ea739e378f6da1bd019ea907e183fc06093de0d89896eef9fc94a2ca5339c2a95dbf5d5fc4412279541687a5d75c92526b255f4d94b982f8f9d09f575c046535686fc9771c7f1a4b85e75a7fa9d93a597a25d3751b380419c25906","n1":"ef571798b3b87160e651da42368aa3785f2f5f610bb695bfefb27cb42beebebe480c5fa4ff0608b5a5ee5544a19bf20fcbe5fde154cbfb2508a432737d9937e8dd5ffe0e97fa1807d437ccb67a515ece4455b5567196d28aa09d42552fd9c8c05f","n2":"288026c24b64b89dee1a694e78d884d1e7830f6c58d9f64945408dea4ee04938ecfe70feb3acf93f3ae87ec5e9bc5d326401c7b51d4e07d6c8915e928e6e2cb2576db5e7101001caf4514baafa8877d1d1f07e68333d640e8c34cd632532d5fa697203a860aa70f5ecbf9cb8682d74e4165d"}}],"go":"5cf41a19df2804e28edd067786f8d263dd41787309ae608da04b9a53797b67494f0226f6e70a2c038e77b77008c30f3cd6b2fb63f79defd395339231b53d5957a8009602bf6bb39eea19c601bf16adf0eda9703c94","sealed":"74485ddea6adbb40e362616a6f047088c56f1453459b50f339d58453005103440fcdbe6ff04ad9ac7c8276c755c6d91d474800a6187b69c57aab02b9ff2249f84cce8f4681f91a96a9d706996d23ca4c1ee5662a2ba41fab45ea84444cb6f7d65537ec580f71c7fb4661a7f27c6da741151c3d44baeba102de99c9fc80f897ba2fe5a594bdbf204a8a7be243b59c2fa5887c8e99adca1e0828dac1aac1de8a0cf274a19a1f6dc859ae0709aeb903d817c77de5aa79a1231276076c"},{"id":"b1","mission":"shop","title":"A quick paint job","ticket":"You drive in blue. `Paint` is supposed to make the car orange. Pick the exit that matches what line 8 prints.","code":"void Paint(Car c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"Look at the parameter on line 1. Does `Paint` get your car, or its own copy of it?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print? Park under that sign.","options":["blue","orange","err"],"sealed":{"blue":"f8ea803fb91dd10ae7c60d0e6553c2ce2422b6c1e26ae86016ab2254b6db6b862cc3aafb460b3a30c4950eb6b4597ab3a4b672ad7365bff379a31ca7301a7750e9b166ab5c3fa26ecbf70767aa1196f0fa9ec5568b7c0c161163fc59018c4eb6077a420d2278","orange":"65a7a4b8a85219215ef52e6d2c531b600f041b63b21a597c78b8f348cdefbf272cb4e86fe12b89e6182be2341f81a65e76192dea725a61236a2c19f9d04618115d1d057bda4db95013a80c5c2cb393e7beb34321a38f7e8a2326b49828a6fdbee6ecb2d82b210616a55b1a1827e92cb7b68d16f3d523d8e48df5a73742cae8bc0521653930d881013762f2fbe4a6f54b0f08a0b2df40d5b40e110fb1490f9868b1c70fe1c3ec","err":"62d8898237954130abdc2c8ed391c1bb423bcab5375c9b4ecc1a453fcdc08752e1e6e0da95f9ffe0b90e313f18e2681c998b937259a2a2e4cfb72f7ebcbb6df05b78a3f578fc30e5b2b731becc2bca36a7c31eedc93be7d3fbf8b040c2ea7a7c6c72b83cc997eec134"}}],"go":"655970bdada7824f3c3d745a1718a2aa91741875ae129561f479068d066cb7e5c58ea3f047639a31d7b6add4d29d50357898a56dc8600507b5a5a791fab9e882e2bd12840756","sealed":"812a2ed3f9be76cf84674fdc8c25620bb77eb8cfebbd7b36511c91850f5b08a86cf383a7e8e059852681770962b8fbc7b586e9e3348d004027c04b7b25a6f7e50821fb5259462c8170a1eb4495feb8943ec069b8d9aa905d23bbca7d58387d4be96764a9c2dcb80516f071342c067f7c0d9d13492446ae"},{"id":"b2","mission":"shop","title":"One character","ticket":"Same shop. Line 1 gained an `&`.","code":"void Paint(Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"With `&`, `c` is another name for the car that was passed in.","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print now?","options":["blue","orange","err"],"sealed":{"blue":"e5cdc067bdd6925e2ef4b6b3d7b76d81798f3de5201f1d8bab03afdd1dd992c7847c84b3b975ab8fb085fa8700bfc15c4ea52a8e8ff4ba5cbb214edd0eb9497de64ba243924662ce5d0146f5ad671a58d6be2c7bbc4827c419e1e489e879bcf821c2332c401f7c551fabe7ae790c42e317752c5b7c37355d9836dd85ed57d354","orange":"64f8fedc6b37883c53eff13e062347d996e132397a21c4b908dccbcb4403f348f597cd2257104f419dbe6439cd058fca87f0aa3736029af3aee713aab043df4db4c60d96b0e2a94b3a312ffa426d38a3ef02066706010e291b0e73968b528deb3ef43e526e78599a7c157c8e660a280a6d019ba73cf5d95ecb","err":"c8a37478527754ea527e39fc02e3731509ff732566f28bd371cf21efee9c5f6a4325b6e50753845b03a6ceeb97701564daa5cce82df006fb9b94ff519ebae7392bbb2c1be4e4cedbdac429fb20625041a149e0f4eadd6e2706c4ee"}}],"go":"dab2a3e953f3fd48cf5febdf2eb1e2fd899e369906dfb38f45b1d9c828e23459cc3565b8e0dd79356d760e4c01ffae79c8f9faf35b8ea3760c9f424bcad2c21f43c857a9e6fbff4572f141c804a375a0af02501dfc7a","sealed":"c173c54cad048357b2febfddc5cbd6a99c10760f363af9ca713e54848a2c763ae5813cf873cd722c921ae6654dd850c59353ddb48704f5205e970bf0f59ce9a8418baab9a238a651cdf9593ba8bd523b839d1849daee2d2d0ce9aaa34992acedc3d9d36b7e0eb932a8af3489998aff7e0271f1608f7e3399dd51dcbffe4d803f6c797af6be3dfd7657d33dfedcb3b6d909432627c7e1c8"},{"id":"b3","mission":"shop","title":"Look, don't touch","ticket":"The shop now takes a `const Car&`.","code":"void Paint(const Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Paint(mine);\n  std::cout \u003c\u003c mine.GetColor();\n}","ids":["c","mine","Paint"],"hint":"`const` is a promise not to change `c`. Does line 2 keep that promise?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":8,"ask":"What does line 8 print now?","options":["blue","orange","err"],"sealed":{"blue":"14af359052244dfbd268af8e844d01242f6ef252aab945a86c372d3eb1dbad95f7735185ecfebeb9222b843cc0d1d62260fe38db6323969a68dfa56e22088014ef10d38d372013e7f08f3931a25297ebc590a85ae2b3db34d48ae5f7338f653b7603cc8bc28eb4e6031c53df597af92e587d9196201b67ec42bd90ab2327e7dd15299be348","orange":"46e3c2ecafe101e21488974575f6da97ea40e01cfc736829f0aab7de31d5427f0de2120d29e2086ff70a8d2654cb8b559d9228fa86aed55f78d38de36786651608ec87beee82cd3ca616762370f3234674702c1f7235975db0dbd4f93804c8dea0cb7cdcea9c5d938d9e70fa2743d08c34cbfa31","err":"573dd781386cf70deffbf5246c938193834fd3cde8b74e4b6da47ea3233795a2a221f87ce22ba5d54930c88d04c7111da5e9246310e10fbccb94cfc4560b23e892499528b8a73515f62558ed4704e7d067e8c9bb0308d5e964142d03d607cbb310441dc79ad79768ee112740cbc22a848221e3827ce3844cac3a8805dacb3acd957a74881db00e92d08b1cb94e18ba0e8229f66909052311c8d97ab65d930e5c2e07a1f7cfb903c49cf93494976c80d7a4860011842ffcfc3c592ce04e845fac4be7dee5ba2077c96bc063ff5fa0"}}],"go":"47f98bbc6ecb61de0cf924f208fac4a3b7f0563b7d353687a48a6a062ab32f2d8d1d3cd6f34020c3358df6d2604b9d132e4380f42f6673ed972397f87bc055cf7dca582956e45bf7fc39bb877764e0","sealed":"059fa37eb58410dcedd868602cdd87207ae637fb2a73941a5d5bdb2573c87f69707d6a2808fe5c7d5056729c117a54889676028ec1c16d14e11b8eaa67a8522aca1e935c9efa9674c82ebc6a32a08ecb6c6324c0f9f27343e14d90d8366ad5e575f05435f1e47f58beeb2aa3127909417775383c987eb35c36009d74cfb55d5fef3ba3469f258e0c6c87e995f4cae71a0a4cd5cb129e9e8ad4484f101ac60b7183b309c96ef313be4e1c395b403b21b45f7b380eab69ee17ecdb07d9160f1be1985d67934b0bc796b829aff208fd29b8f8d5d3"},{"id":"b4","mission":"shop","title":"The loaner","ticket":"The shop paints by reference again, but line 7 makes a second car first.","code":"void Paint(Car& c) {\n  c.SetColor(\"orange\");\n}\n\nint main() {\n  Car mine{\"blue\"};\n  Car loaner = mine;\n  Paint(loaner);\n  std::cout \u003c\u003c mine.GetColor();\n  std::cout \u003c\u003c loaner.GetColor();\n}","ids":["c","mine","loaner","Paint"],"hint":"Line 7 runs the copy constructor. How many Car objects exist after it?","scene":{"spots":[{"id":"blue","kind":"sign","text":"blue","swatch":"blue"},{"id":"orange","kind":"sign","text":"orange","swatch":"orange"},{"id":"err","kind":"sign","text":"Does not\ncompile"}],"player":{"type":"sedan","color":"blue"}},"steps":[{"line":9,"ask":"What does line 9 print?","options":["blue","orange","err"],"sealed":{"blue":"5e83040588ce9b4530829887b92129d352354528059c15cfbadd71cc43bb2476b742b06674e85c34ac0df98c9ba8b90bc2c7198253980cbd74d6bab44fdc5e0444bfbde3033e6043569497304eef04e9fcb09c48e37f6d","orange":"29ce3bbf9cea6fca0834edda0640974ddb1f43fd470e1beac04c54b78305113ed6cb3385e10f66a58d0248fe97afe94e7d69a3bd33ddc4b6e63112b0227ccda29fda12a0e666723cc423ef89b2464ca9319cf10dd6af2a30f50b1ec6c9fe8a6e3edf4a92c1d9b9c65694488f7312326bd2b0617310d79a7217b8f6eb0b94c794b7dad77b3379a80a75a99870eba8de55fe841045e5f8acac71243a52657258f7f3ba6924e7","err":"f3fd9d176e35cc24ffe451c32f95b73a43af1fca6d19e0d9c0da10487535478b823a6fac6641e65b3b71d401ea16825a1685a08b9fd92ebd920b5c8c26cfa6285aedac9466d542e7fdef6b81ba427d0db25458217cfa225622a8d553d76c2750fd18ef2171"}},{"line":10,"ask":"And line 10?","options":["blue","orange","err"],"sealed":{"blue":"288d45bc75e28fbb18c1537c9d32a82b0daab6638c0edd6e7964211b22c1ebe9bd3aae1e78ef8388d4f4efa7ee1ad98a854ac9a108aafdcdd84e3f8bbaa21c381bc69dcb1bb09f7d6cc981e835208a421889831f02c863f1c3d5658cfc46324418e46e8c24a0965de40fc28ae11ceebbabd1276bec6f5d9b2e","orange":"962106b128fc7cc4c734935bb8be2d6f29b8afa6b1703ad73b4c45e185341a22251a0c8d6df880851be5272c96a043f0ff64659df26622302fd4c8c211a5","err":"0cce7110a89e07656015eac21a561852a1e224ceae1342699d8cfdfb4bb30487e1fa8845"}}],"go":"2369d34d8439adadd179c33ebdf729ce228b25e8627335c92b8a49d82296d613a2074ef3f13cfc39b1dbc201e127f9f0b361336deb9d82d24c6901ce2ff7b98cdaf692544539d3bb278fe78395726db82255220881c3283e7a4ecb71c268497e686896","sealed":"5cc5ac427340e6cf7fb1a845f70416464bc38171cf84bfdc2619125cc443971850b6a33a8fdb6fced3c8dc5ba7ff498d0c1aed09c7fbf7447370bfd3d4ea34db1f33554459b80a100c39da843d855afe359f08b0d65dac4abde1c41bc072fbdf8e9690dfc7a96c9a0bbf27b853dde77803b741a4a0a459cd9d53be447f306123b12d2350f6fbca7424cd06c60582827a6aa69cfc6f79b48af49eab6f691e"}];
 
 // ------------------------------------------------------------------ setup
 
@@ -518,6 +555,24 @@ const REST_MS = 12000;
 const HINT_DELAY_MS = 60000;
 const AWAY_MS = 30 * 60000;
 const PING_MS = 45000;
+// The delivery at the end of a job: the tip for a fast drive, what one bump
+// from traffic takes out of it, and what a found semicolon pays.
+const TIP = 100;
+const HIT_COST = 20;
+const SEMI_PAY = 20;
+const TRAFFIC_N = 14;
+const SND_KEY = 'segfault-city-sound';
+
+// What the Mod Shop sells. `cost` has one price per level.
+const UPGRADES = [
+  { id: 'engine', name: 'Engine tune', cost: [400, 800, 1200], what: 'A higher top speed and a quicker start.' },
+  { id: 'tires', name: 'Grip tires', cost: [300, 600], what: 'Sharper turns and shorter stops.' },
+  { id: 'nitro', name: 'Nitro', cost: [1000], what: 'Hold Shift (or the Nitro button on a phone) for a burst of speed. It refills in a few seconds.' },
+  { id: 'bar', name: 'Bull bar', cost: [600], what: 'A bump from traffic no longer costs you tip money.' },
+  { id: 'horn', name: 'Air horn', cost: [350], what: 'Louder, and it clears traffic from twice as far away.' },
+  { id: 'radar', name: 'Semicolon radar', cost: [200], what: 'Puts every missing semicolon on the map.' },
+  { id: 'glow', name: 'Underglow', cost: [250], what: 'Orange light under the car. It does nothing. It looks great.' },
+];
 
 // Where progress reports go (attendance and the instructor's live board). A
 // copy opened from a file or localhost reports to a local test Worker, never
@@ -589,19 +644,24 @@ function newId() {
 
 function newWork() {
   return { step: 0, ans: [], patches: [], tried: {}, wrong: 0, outs: 0, hint: false, hintOpen: false,
-           leg: false, done: false, fb: null, debrief: '', cash: 0, enteredAt: Date.now() };
+           leg: false, go: null, legX: 0, legY: 0, legAt: 0, hits: 0, tip: 0,
+           done: false, fb: null, debrief: '', cash: 0, enteredAt: Date.now() };
 }
 
 function fresh(team, players) {
   const now = Date.now();
   return { v: 1, id: newId(), team, players, startedAt: now, seenAt: now, res: {}, cur: null, work: null,
-           warn: 0, restUntil: 0, finishedAt: null,
+           warn: 0, restUntil: 0, finishedAt: null, up: {}, spent: 0, semi: [],
            car: { x: SPAWN.x, y: SPAWN.y, a: -Math.PI / 2, type: 'sedan', color: 'orange' } };
 }
 
 function save() { if (state) store.set(KEY, state); }
 function curJob() { return state.cur ? jobById(state.cur) : null; }
-function totalCash() { return Object.values(state.res).reduce((n, r) => n + (r.cash || 0), 0) * 100; }
+// Everything earned (jobs, tips, semicolons) is the score. The wallet is that minus what the Mod Shop took.
+function totalCash() {
+  return Object.values(state.res).reduce((n, r) => n + (r.cash || 0) * 100 + (r.tip || 0), 0) + state.semi.length * SEMI_PAY;
+}
+function wallet() { return totalCash() - state.spent; }
 function clearedCount() { return Object.values(state.res).filter((r) => !r.skip).length; }
 function nextIn(mid) { return jobsOf(mid).find((j) => !state.res[j.id]) || null; }
 function marks() {
@@ -643,7 +703,10 @@ function catchUp() {
   const gap = now - (state.seenAt || now);
   if (gap > AWAY_MS) {
     if (!state.finishedAt) state.startedAt += gap;
-    if (state.work) state.work.enteredAt += gap;
+    if (state.work) {
+      state.work.enteredAt += gap;
+      if (state.work.legAt) state.work.legAt += gap;
+    }
   }
   state.seenAt = now;
   if (gap > AWAY_MS || now - seenSavedAt > 4000) { seenSavedAt = now; save(); }
@@ -661,10 +724,37 @@ const H_NAMES = ['Deref Dr', 'Reference Rd', 'Iterator Way'];
 const PIER = { x0: 1535, x1: 1665, y0: 2060, y1: 2330 };
 const FOUNTAIN = { x: 1600, y: 1480, r: 56 };
 const SPAWN = { x: 1600, y: 1665 };
+// Where a job can send you. `b` is the building (x, y, w, h); x and y are
+// where you pull in, on the apron between the building and the road.
 const PLACES = {
   pier: { x: 1600, y: 2262, label: 'End of the pier' },
   plaza: { x: 1600, y: 1335, label: 'The fountain' },
+  hall: { x: 1600, y: 310, label: 'City Hall', b: [1500, 178, 200, 96] },
+  dmv: { x: 2400, y: 310, label: 'DMV', b: [2310, 178, 180, 96] },
+  diner: { x: 800, y: 1930, label: 'Byte Diner', b: [710, 1966, 180, 96] },
+  depot: { x: 2400, y: 1930, label: 'Bus Depot', b: [2300, 1966, 200, 96] },
+  post: { x: 310, y: 760, label: 'Post Office', b: [178, 670, 96, 180] },
+  scrap: { x: 310, y: 1480, label: 'Scrapyard', b: [178, 1390, 96, 180] },
+  light: { x: 2890, y: 760, label: 'Lighthouse', b: [2926, 712, 96, 96] },
+  wash: { x: 2890, y: 1480, label: 'Car Wash', b: [2926, 1390, 96, 180] },
 };
+const MOD = { x: 1482, y: 1625, b: [1290, 1570, 136, 110] };
+// Somebody's code is missing its semicolons. They are all over town.
+const SEMIS = [
+  [400, 232], [1200, 232], [2000, 232], [2800, 232], [400, 2008], [1200, 2008], [2000, 2008], [2800, 2008],
+  [232, 400], [232, 1120], [232, 1840], [2968, 400], [2968, 1120], [2968, 1840],
+  [1600, 2140], [1425, 1300], [1775, 1660], [1100, 1020], [2700, 1020], [500, 1740],
+  [2400, 1222], [2400, 1600], [800, 1120], [2400, 1120],
+];
+const CONE_AT = [
+  [2130, 1500], [2185, 1500], [2240, 1500], [2345, 1500], [2400, 1500], [2455, 1500], [2560, 1500], [2615, 1500], [2670, 1500],
+  [1575, 1930], [1625, 1975], [1575, 2020], [1625, 2060],
+];
+const BOATS = [
+  { cx: 1000, cy: 72, rx: 520, ry: 28, sp: 0.05 },
+  { cx: 3122, cy: 1200, rx: 36, ry: 640, sp: 0.04 },
+  { cx: 700, cy: 2235, rx: 430, ry: 50, sp: -0.045 },
+];
 const SOON = ['City Directory', 'Bus Route', 'Parking Tower'];
 const PAINT = { orange: '#FF7900', blue: '#2973B6', sky: '#8ACCE4', citrus: '#EDA941', white: '#E9EEF3', cal: '#3E6FB3', gray: '#8796A5' };
 const CAR_R = 20;
@@ -686,38 +776,49 @@ const STATIC = { rects: [], trees: [], buildings: [] };
 
 (function buildCity() {
   const rnd = rng(121);
-  const nearRoad = (v, list) => list.some((c) => Math.abs(v - c) < RW / 2 + 22);
   const addBuilding = (x, y, w, h) => {
     const b = { x, y, w, h, roof: ROOFS[Math.floor(rnd() * ROOFS.length)], lit: rnd() };
     STATIC.buildings.push(b);
     STATIC.rects.push(b);
   };
-  // The strips between the outer roads and the water: buildings with gaps.
-  for (const y of [196, 1936]) {
-    let x = 200;
-    while (x < 2960) {
-      const w = 110 + Math.floor(rnd() * 130);
-      const clear = !nearRoad(x, VX) && !nearRoad(x + w, VX) && !VX.some((c) => c > x && c < x + w)
-        && !(y > 1000 && x + w > PIER.x0 - 40 && x < PIER.x1 + 40);
-      if (clear && x + w < 3000) {
-        if (rnd() < 0.74) addBuilding(x, y, w, 108);
-        else for (let t = 0; t < 3; t++) STATIC.trees.push({ x: x + 24 + t * (w - 48) / 2, y: y + 30 + rnd() * 50, r: 20 + rnd() * 10 });
+  // The strips between the outer roads and the water. Each run of free
+  // ground between two roads or landmarks gets packed with buildings and trees.
+  const pack = (lo, hi, blocked, put) => {
+    let at = lo;
+    for (const [b0, b1] of [...blocked.sort((p, q) => p[0] - q[0]), [hi, hi]]) {
+      let x = at;
+      while (b0 - x >= 96) {
+        const room = b0 - x;
+        const len = room <= 250 ? room : Math.min(110 + Math.floor(rnd() * 130), room - 130);
+        put(x, len);
+        x += len + 34 + Math.floor(rnd() * 40);
       }
-      x += w + 34 + Math.floor(rnd() * 50);
+      at = Math.max(at, b1);
     }
+  };
+  const places = Object.values(PLACES).filter((p) => p.b).map((p) => p.b);
+  for (const y of [196, 1936]) {
+    const blocked = VX.map((c) => [c - 82, c + 82]);
+    if (y > 1000) blocked.push([PIER.x0 - 40, PIER.x1 + 40]);
+    for (const q of places) if (q[2] > q[3] && Math.abs(q[1] - y) < 120) blocked.push([q[0] - 40, q[0] + q[2] + 40]);
+    pack(200, 2990, blocked, (x, w) => {
+      if (rnd() < 0.74) addBuilding(x, y, w, 108);
+      else for (let t = 0; t < 3; t++) STATIC.trees.push({ x: x + 24 + t * (w - 48) / 2, y: y + 30 + rnd() * 50, r: 20 + rnd() * 10 });
+    });
   }
   for (const x of [196, 2896]) {
-    let y = 350;
-    while (y < 1880) {
-      const h = 110 + Math.floor(rnd() * 120);
-      const clear = !nearRoad(y, HY) && !nearRoad(y + h, HY) && !HY.some((c) => c > y && c < y + h);
-      if (clear) {
-        if (rnd() < 0.7) addBuilding(x, y, 108, h);
-        else for (let t = 0; t < 3; t++) STATIC.trees.push({ x: x + 30 + rnd() * 50, y: y + 22 + t * (h - 44) / 2, r: 20 + rnd() * 10 });
-      }
-      y += h + 34 + Math.floor(rnd() * 50);
-    }
+    const blocked = HY.map((c) => [c - 82, c + 82]);
+    for (const q of places) if (q[2] <= q[3] && Math.abs(q[0] - x) < 120) blocked.push([q[1] - 40, q[1] + q[3] + 40]);
+    pack(350, 1890, blocked, (y, h) => {
+      if (rnd() < 0.7) addBuilding(x, y, 108, h);
+      else for (let t = 0; t < 3; t++) STATIC.trees.push({ x: x + 30 + rnd() * 50, y: y + 22 + t * (h - 44) / 2, r: 20 + rnd() * 10 });
+    });
   }
+  // The places jobs deliver to, and the Mod Shop in the plaza.
+  for (const [id, p] of Object.entries(PLACES)) {
+    if (p.b) STATIC.rects.push({ x: p.b[0], y: p.b[1], w: p.b[2], h: p.b[3], kind: 'place', id, name: p.label });
+  }
+  STATIC.rects.push({ x: MOD.b[0], y: MOD.b[1], w: MOD.b[2], h: MOD.b[3], kind: 'mod', name: 'Mod Shop' });
   // Backdrops inside the mission blocks.
   const g = blockRect(0, 0);
   STATIC.rects.push({ x: g.x0 + 40, y: g.y0 + 10, w: 600, h: 84, kind: 'garage' });
@@ -748,7 +849,7 @@ const PAD_R = 46;
 function isSign(s) { return s.kind === 'sign'; }
 
 // A job's spots with every solved step's changes applied, laid out in its block.
-function sceneOf(job, patches, live) {
+function sceneOf(job, patches, live, gone) {
   const mission = missionOf(job);
   const b = blockOf(mission);
   const spots = job.scene.spots.map((s) => ({ ...s }));
@@ -757,7 +858,8 @@ function sceneOf(job, patches, live) {
     for (const [id, change] of Object.entries(p.spots || {})) Object.assign(spots.find((s) => s.id === id), change);
     if (p.arrows) arrows = p.arrows;
   }
-  const decor = (job.scene.decor || []).map((s) => ({ ...s, decor: true }));
+  // `gone` is the kind of vehicle you drove off in: it is no longer parked here.
+  const decor = (job.scene.decor || []).filter((s) => s.type !== gone).map((s) => ({ ...s, decor: true }));
   const place = (list, rowY, padY) => {
     const gap = Math.min((b.x1 - b.x0) / Math.max(1, list.length), 190);
     const left = (b.x0 + b.x1) / 2 - gap * (list.length - 1) / 2;
@@ -773,7 +875,10 @@ function scenes() {
   if (sceneCache) return sceneCache;
   sceneCache = MISSIONS.map((m) => {
     const job = curJob();
-    if (job && job.mission === m.id) return sceneOf(job, state.work.patches, !state.work.done && !state.work.leg);
+    if (job && job.mission === m.id) {
+      const w = state.work;
+      return sceneOf(job, w.patches, !w.done && !w.leg, (w.leg || w.done) && w.go && w.go.ride ? w.go.ride.type : null);
+    }
     const jobs = jobsOf(m.id);
     return sceneOf(nextIn(m.id) || jobs[jobs.length - 1], [], false);
   });
@@ -845,9 +950,8 @@ function choose(optId) {
     w.fb = { good: true, text: res.say, step: w.step };
     w.step++;
     say('Correct', '#A6DB86');
-    if (w.step >= job.steps.length) {
-      if (job.leg) w.leg = true; else finishJob();
-    }
+    SFX.good();
+    if (w.step >= job.steps.length) startLeg(job);
   } else {
     tried.push(optId);
     w.wrong++;
@@ -856,20 +960,52 @@ function choose(optId) {
     say(`warning ${state.warn} of ${WARNS}`, '#EDA941');
     shake = 0.35;
     report('wrong', { guess: `${w.step + 1}:${optId}` });
-    if (state.warn >= WARNS) crash();
+    if (state.warn >= WARNS) crash(); else SFX.bad();
   }
   touch();
 }
 
-function finishJob() {
+// Every job ends with a drive. Where to is sealed with the job's answers,
+// because it tends to name them ("tow the car from space 1").
+function startLeg(job) {
+  const w = state.work;
+  let go = null;
+  try { go = JSON.parse(unseal(job.go, debriefKey(job.id, [...w.ans, 'leg']))); } catch (e) { go = null; }
+  if (!go || !PLACES[go.to]) { finishJob(); return; }
+  Object.assign(w, { leg: true, go, legX: state.car.x, legY: state.car.y, legAt: 0, hits: 0 });
+  if (go.ride) Object.assign(state.car, go.ride);
+  tow = null;
+}
+
+// The tip holds at full for a fair driving time (par), then drains to zero
+// over the same time again. Every bump from traffic takes a bite out of it.
+// The clock starts when the car pulls out, so there is time to read first.
+function legPar(w) {
+  const t = PLACES[w.go.to];
+  return (Math.abs(t.x - w.legX) + Math.abs(t.y - w.legY)) / 300 + 5;
+}
+// How the job went sets the most the delivery can tip: all of it after a
+// clean job, half after a wrong pick or a hint, a quarter after a crash.
+function tipCap(w) { return TIP * [0, 0.25, 0.5, 1][payFor(w)]; }
+function tipNow(w) {
+  const par = legPar(w);
+  const cap = tipCap(w);
+  const sec = w.legAt ? (Date.now() - w.legAt) / 1000 : 0;
+  const base = sec <= par ? cap : cap * Math.max(0, 1 - (sec - par) / par);
+  return Math.max(0, Math.ceil(base / 5) * 5 - HIT_COST * (w.hits || 0));
+}
+
+function finishJob(noTip) {
   const job = curJob();
   const w = state.work;
+  w.tip = w.leg && w.go && noTip !== true ? tipNow(w) : 0;
   w.leg = false;
   w.done = true;
   w.cash = payFor(w);
   w.debrief = unseal(job.sealed, debriefKey(job.id, w.ans)) || '';
-  state.res[job.id] = { cash: w.cash, wrong: w.wrong, hint: w.hint };
-  say(`+$${w.cash * 100}`, '#EDA941');
+  state.res[job.id] = { cash: w.cash, wrong: w.wrong, hint: w.hint, tip: w.tip };
+  say(w.tip ? `+$${w.cash * 100} and a $${w.tip} tip` : `+$${w.cash * 100}`, '#EDA941');
+  SFX.cash();
   const allMain = MAIN_JOBS.every((j) => state.res[j.id]);
   if (allMain && !state.finishedAt) state.finishedAt = Date.now();
   report(allMain && MAIN_JOBS.includes(job) && MAIN_JOBS.filter((j) => state.res[j.id]).length === MAIN_JOBS.length ? 'finish' : 'clear');
@@ -906,6 +1042,7 @@ function crash() {
   state.work.outs++;
   state.restUntil = Date.now() + REST_MS;
   report('crash');
+  SFX.crash();
   showCrash();
 }
 
@@ -934,7 +1071,8 @@ function checkRest() {
 
 function renderBar() {
   $('bar-team').textContent = state.team;
-  $('bar-cash').textContent = `$${totalCash()}`;
+  $('bar-cash').textContent = `$${wallet()}`;
+  $('boost').hidden = !state.up.nitro;
   $('warns').innerHTML = Array.from({ length: WARNS }, (_, i) => `<i class="${i < state.warn ? 'hot' : ''}"></i>`).join('');
 }
 
@@ -991,8 +1129,13 @@ function roamHtml() {
       <p class="story">Drive to an orange ring and press <kbd>Space</kbd>. Any order works. The map in the corner shows where the rings are.</p>`;
   }
   return `<section class="room-head">${head}</section><ul class="jobs">${list}</ul>
+    <div class="note">
+      <span class="kicker">Around town</span>
+      <p><b>Mod Shop</b>, next to the fountain: spend your $${wallet()} on your car.</p>
+      <p><b>Missing semicolons:</b> ${state.semi.length} of ${SEMIS.length} found. Each one pays $${SEMI_PAY}.</p>
+    </div>
     <div class="note keys">
-      <p><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys to drive, <kbd>Space</kbd> to act, <kbd>H</kbd> to honk.</p>
+      <p><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys to drive, <kbd>Space</kbd> to act, <kbd>H</kbd> to honk, <kbd>M</kbd> to mute.${state.up.nitro ? ' Hold <kbd>Shift</kbd> for nitro.' : ''}</p>
       <p>On a phone: drag anywhere on the city to steer, and tap the round button to act.</p>
     </div>`;
 }
@@ -1006,7 +1149,7 @@ function jobHtml(job) {
     const next = nextIn(m.id);
     return `<div class="cleared-card">
       <span class="kicker">${where} &middot; cleared</span>
-      <h2>${esc(job.title)}<span class="answer-chip">+$${w.cash * 100}</span></h2>
+      <h2>${esc(job.title)}<span class="answer-chip">+$${w.cash * 100}</span>${w.tip ? `<span class="answer-chip tip">+$${w.tip} tip</span>` : ''}</h2>
       <div class="why rich">${rich(w.debrief)}</div>
       <button class="btn" type="button" id="b-next">${next ? 'Next job' : 'Back to the city'}</button>
     </div>`;
@@ -1016,17 +1159,19 @@ function jobHtml(job) {
   const canHint = Date.now() - w.enteredAt >= HINT_DELAY_MS;
   const hint = w.hintOpen ? `<div class="hint-box"><span class="kicker">Hint</span><span class="rich">${rich(job.hint)}</span></div>` : '';
   const ask = w.leg
-    ? `<span class="kicker">Last leg</span><p class="q rich">${rich(job.leg.say)}</p>`
+    ? `<span class="kicker">Deliver it</span><p class="q rich">${rich(w.go.say)}</p>
+       <p class="tipline">A fast drive that stays clear of traffic adds a tip of up to $${tipCap(w)}${tipCap(w) < TIP ? ` (a clean job tips up to $${TIP})` : ''}. The tip clock starts when you pull out.</p>`
     : `<span class="kicker">Step ${w.step + 1} of ${job.steps.length}</span><p class="q rich">${rich(st.ask)}</p>`;
   // The question and the latest feedback stay docked at the bottom of the
   // panel, so they are on screen however long the code is.
   return `<section class="room-head"><span class="kicker">${where}</span><h2>${esc(job.title)}</h2>
       <p class="story rich">${rich(job.ticket)}</p></section>
     ${codeBlock(job.code, job.ids, w.leg ? 0 : st.line)}${hint}
-    <div class="hint-zone">
-      ${w.hintOpen ? '' : `<button class="btn ghost small" type="button" id="b-hint" ${canHint ? '' : 'disabled'}>${canHint ? 'Need a hint? Job pays $200' : 'Hint unlocks after a minute'}</button>`}
+    <div class="hint-zone">${w.leg
+      ? '<button class="btn ghost small" type="button" id="b-drive">Skip the drive (no tip)</button>'
+      : `${w.hintOpen ? '' : `<button class="btn ghost small" type="button" id="b-hint" ${canHint ? '' : 'disabled'}>${canHint ? 'Need a hint? Job pays $200, tip is halved' : 'Hint unlocks after a minute'}</button>`}
       <button class="btn ghost small" type="button" id="b-leave">Leave this mission</button>
-      <button class="btn ghost small" type="button" id="b-skip">Skip this job for $0</button>
+      <button class="btn ghost small" type="button" id="b-skip">Skip this job for $0</button>`}
     </div>
     <div class="dock">${fb}<div class="ask">${ask}</div></div>`;
 }
@@ -1036,6 +1181,7 @@ $('panel').addEventListener('click', (ev) => {
   const id = ev.target.id;
   if (id === 'b-next') nextJob();
   else if (id === 'b-leave') leaveJob();
+  else if (id === 'b-drive') { if (state.work && state.work.leg) finishJob(true); }
   else if (id === 'b-hint') {
     if (Date.now() - state.work.enteredAt < HINT_DELAY_MS) return;
     state.work.hint = true;
@@ -1053,17 +1199,21 @@ $('panel').addEventListener('click', (ev) => {
 
 const keys = {};
 const stick = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
-const DRIVE_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'Enter', 'e', 'h'];
+const DRIVE_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', ' ', 'Enter', 'e', 'h', 'm', 'Shift'];
+let boostDown = false;
 
 function typing() { const t = document.activeElement; return t && /^(INPUT|TEXTAREA)$/.test(t.tagName); }
 
 window.addEventListener('keydown', (ev) => {
   if ($('v-game').hidden || typing() || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  // While the Mod Shop is open the keys belong to its buttons.
+  if (!$('shop').hidden) { if (ev.key === 'Escape') closeShop(); return; }
   const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
   if (!DRIVE_KEYS.includes(k)) return;
   ev.preventDefault();
   if (k === ' ' || k === 'Enter' || k === 'e') { if (!ev.repeat) act(); return; }
   if (k === 'h') { if (!ev.repeat) honk(); return; }
+  if (k === 'm') { if (!ev.repeat) setSound(!snd.on); return; }
   keys[k] = true;
 });
 window.addEventListener('keyup', (ev) => {
@@ -1071,7 +1221,7 @@ window.addEventListener('keyup', (ev) => {
   keys[k] = false;
   if (!$('v-game').hidden && !typing() && DRIVE_KEYS.includes(k)) ev.preventDefault();
 });
-window.addEventListener('blur', () => { Object.keys(keys).forEach((k) => { keys[k] = false; }); stick.on = false; });
+window.addEventListener('blur', () => { Object.keys(keys).forEach((k) => { keys[k] = false; }); stick.on = false; boostDown = false; });
 
 const canvas = $('city');
 canvas.addEventListener('pointerdown', (ev) => {
@@ -1093,6 +1243,9 @@ const endStick = (ev) => { if (ev.pointerId === stick.id) { stick.on = false; st
 canvas.addEventListener('pointerup', endStick);
 canvas.addEventListener('pointercancel', endStick);
 $('act').addEventListener('click', () => act());
+const boostBtn = $('boost');
+boostBtn.addEventListener('pointerdown', (ev) => { boostDown = true; ev.preventDefault(); });
+for (const type of ['pointerup', 'pointercancel', 'pointerleave']) boostBtn.addEventListener(type, () => { boostDown = false; });
 
 // What Space would do right now, or null.
 let focus = null;
@@ -1100,6 +1253,7 @@ function findFocus() {
   const car = state.car;
   const job = curJob();
   const w = state.work;
+  if (Math.hypot(car.x - MOD.x, car.y - MOD.y) < 56) return { kind: 'shop', label: 'Open the Mod Shop', short: 'Shop' };
   if (job && w.done) return { kind: 'next', label: nextIn(job.mission) ? 'Next job' : 'Back to the city', short: 'Next' };
   if (job && !w.leg) {
     const options = activeOptions();
@@ -1135,10 +1289,279 @@ function act() {
   if (f.kind === 'next') nextJob();
   else if (f.kind === 'pick') choose(f.id);
   else if (f.kind === 'start') startMission(f.id);
+  else if (f.kind === 'shop') openShop();
 }
 
-const HONKS = { sedan: 'Beep!', truck: 'HOOONK!', tow: 'HOOONK!', van: 'Beep beep!', moto: 'Meep!', bus: 'Beep!' };
-function honk() { say(HONKS[state.car.type] || 'Beep!', '#FFFFFF'); }
+// A motorcycle and a bus honk like any Vehicle. A truck has its own horn.
+const HONKS = { sedan: 'Beep!', truck: 'HOOONK!', tow: 'HOOONK!', van: 'Beep beep!', moto: 'Beep!', bus: 'Beep!' };
+function honk() {
+  if (!state || Date.now() < state.restUntil) return;
+  const car = state.car;
+  const air = !!state.up.horn;
+  say(air ? 'HOOOOONK!' : HONKS[car.type] || 'Beep!', '#FFFFFF');
+  hornSound(air ? 'air' : car.type, 1);
+  // Traffic in front of you pulls over, or hurries out of the intersection.
+  const reach = air ? 600 : 300;
+  for (const n of traffic) {
+    const rx = n.x - car.x, ry = n.y - car.y;
+    const d = Math.hypot(rx, ry);
+    if (d > reach) continue;
+    const front = (rx * Math.cos(car.a) + ry * Math.sin(car.a)) / (d || 1);
+    if (d > 110 && front < 0.35) continue;
+    if (n.mode === 'lane' && n.len - n.s > 190) n.pull = 2.6; else n.rush = 1.6;
+  }
+}
+
+// ------------------------------------------------------------------ sound
+// Everything is made with oscillators and noise, so there are no files to load.
+
+const snd = { on: store.get(SND_KEY) !== false, ctx: null, out: null };
+function audio() {
+  if (!snd.on) return null;
+  try {
+    if (!snd.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      snd.ctx = new AC();
+      snd.out = snd.ctx.createGain();
+      snd.out.gain.value = 0.5;
+      snd.out.connect(snd.ctx.destination);
+    }
+    if (snd.ctx.state === 'suspended') snd.ctx.resume();
+    return snd.ctx;
+  } catch (e) { return null; }
+}
+// One note: a pitch that can slide, with a quick fade in and out.
+function note(type, f0, f1, at, dur, vol) {
+  const ac = audio();
+  if (!ac) return;
+  const t = ac.currentTime + at;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.012);
+  g.gain.setValueAtTime(vol, t + Math.max(0.014, dur - 0.05));
+  g.gain.linearRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  g.connect(snd.out);
+  o.start(t);
+  o.stop(t + dur + 0.03);
+}
+// A burst of noise that dies away, for bumps and whooshes.
+function hiss(dur, vol, cutoff) {
+  const ac = audio();
+  if (!ac) return;
+  const n = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = ac.createBufferSource();
+  const f = ac.createBiquadFilter();
+  const g = ac.createGain();
+  src.buffer = buf;
+  f.type = 'lowpass';
+  f.frequency.value = cutoff;
+  g.gain.value = vol;
+  src.connect(f);
+  f.connect(g);
+  g.connect(snd.out);
+  src.start();
+}
+const SFX = {
+  good() { note('triangle', 660, 660, 0, 0.11, 0.3); note('triangle', 990, 990, 0.1, 0.22, 0.3); },
+  bad() { note('sawtooth', 170, 105, 0, 0.3, 0.2); },
+  cash() { [1047, 1319, 1568, 2093].forEach((f, i) => note('triangle', f, f, i * 0.07, 0.15, 0.24)); },
+  semi() { note('square', 1320, 1760, 0, 0.12, 0.1); },
+  bump() { hiss(0.22, 0.9, 420); note('sine', 120, 50, 0, 0.2, 0.5); },
+  cone() { hiss(0.07, 0.45, 2400); },
+  crash() { note('sawtooth', 420, 45, 0, 0.9, 0.26); hiss(0.7, 0.6, 900); },
+  buy() { [523, 659, 784, 1047].forEach((f, i) => note('square', f, f, i * 0.06, 0.1, 0.1)); },
+  nitro() { hiss(0.5, 0.5, 1600); note('sawtooth', 90, 260, 0, 0.45, 0.12); },
+  go() { note('triangle', 523, 523, 0, 0.09, 0.22); note('triangle', 784, 784, 0.09, 0.16, 0.22); },
+};
+function hornSound(type, vol) {
+  if (type === 'air') { for (const f of [175, 220, 262]) note('sawtooth', f, f, 0, 0.9, 0.2 * vol); return; }
+  if (type === 'truck' || type === 'tow') { note('sawtooth', 147, 147, 0, 0.7, 0.24 * vol); note('sawtooth', 185, 185, 0, 0.7, 0.2 * vol); return; }
+  if (type === 'van') {
+    for (const at of [0, 0.2]) { note('square', 494, 494, at, 0.13, 0.12 * vol); note('square', 622, 622, at, 0.13, 0.1 * vol); }
+    return;
+  }
+  note('square', 440, 440, 0, 0.3, 0.12 * vol);
+  note('square', 554, 554, 0, 0.3, 0.1 * vol);
+}
+function setSound(on) {
+  snd.on = on;
+  store.set(SND_KEY, on);
+  $('snd').classList.toggle('off', !on);
+  $('snd').setAttribute('aria-pressed', String(on));
+  if (on) SFX.semi();
+}
+$('snd').addEventListener('click', () => { setSound(!snd.on); $('snd').blur(); });
+$('snd').classList.toggle('off', !snd.on);
+$('snd').setAttribute('aria-pressed', String(snd.on));
+
+// ------------------------------------------------------------------ the Mod Shop
+
+let shopAt = 0;
+function renderShop() {
+  $('shop-cash').textContent = `$${wallet()}`;
+  $('mods').innerHTML = UPGRADES.map((u) => {
+    const lv = state.up[u.id] || 0;
+    const max = u.cost.length;
+    const level = max > 1 ? `<span class="lv">level ${lv} of ${max}</span>` : '';
+    const right = lv >= max
+      ? '<span class="pr">owned</span>'
+      : `<button class="btn small" type="button" data-buy="${u.id}" ${wallet() < u.cost[lv] ? 'disabled' : ''}>$${u.cost[lv]}</button>`;
+    return `<li class="${lv >= max ? 'done' : ''}"><span class="nm">${esc(u.name)}${level}</span>${right}<span class="tp">${esc(u.what)}</span></li>`;
+  }).join('');
+}
+function openShop() {
+  Object.keys(keys).forEach((k) => { keys[k] = false; });
+  speed = 0;
+  shopAt = performance.now();
+  renderShop();
+  $('shop').hidden = false;
+}
+function closeShop() {
+  $('shop').hidden = true;
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  touch();
+}
+function buy(id) {
+  const u = UPGRADES.find((q) => q.id === id);
+  const lv = state.up[id] || 0;
+  if (!u || lv >= u.cost.length || wallet() < u.cost[lv]) return;
+  state.spent += u.cost[lv];
+  state.up[id] = lv + 1;
+  save();
+  renderBar();
+  renderShop();
+  if (id === 'horn') hornSound('air', 1); else SFX.buy();
+}
+$('shop').addEventListener('click', (ev) => {
+  const id = ev.target.getAttribute('data-buy');
+  if (id) { buy(id); return; }
+  // The Space that opened the shop must not also close it.
+  if ((ev.target.id === 'shop-close' || ev.target === $('shop')) && performance.now() - shopAt > 350) closeShop();
+});
+
+// ------------------------------------------------------------------ traffic
+// Cars follow the right-hand lane from one intersection to the next and pick
+// a new direction at each one. They stop for whatever is in front of them.
+
+const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];   // east, south, west, north
+const LANE = 30;
+const traffic = [];
+function hasRoad(i, j, d) {
+  const a = i + DIRS[d][0], b = j + DIRS[d][1];
+  return a >= 0 && a < VX.length && b >= 0 && b < HY.length;
+}
+// Where a car heading d enters (side -1) or leaves (side 1) the intersection
+// (i, j). The right of a heading is the next heading clockwise.
+function gate(i, j, d, side) {
+  const [dx, dy] = DIRS[d];
+  const [rx, ry] = DIRS[(d + 1) % 4];
+  return { x: VX[i] + dx * side * RW / 2 + rx * LANE, y: HY[j] + dy * side * RW / 2 + ry * LANE };
+}
+function setLane(n, i, j, d) {
+  const a = gate(i, j, d, 1);
+  n.i = i + DIRS[d][0];
+  n.j = j + DIRS[d][1];
+  n.d = d;
+  const b = gate(n.i, n.j, d, -1);
+  Object.assign(n, { mode: 'lane', p0: a, p1: b, s: 0, len: Math.hypot(b.x - a.x, b.y - a.y) });
+}
+// At the intersection (n.i, n.j): straight on is twice as likely as each turn.
+function setTurn(n) {
+  const opts = [n.d, n.d, (n.d + 1) % 4, (n.d + 3) % 4].filter((d) => hasRoad(n.i, n.j, d));
+  const d2 = opts[Math.floor(Math.random() * opts.length)];
+  const a = gate(n.i, n.j, n.d, -1);
+  const b = gate(n.i, n.j, d2, 1);
+  const r1 = DIRS[(n.d + 1) % 4], r2 = DIRS[(d2 + 1) % 4];
+  // A turn bends around the point where the two lanes cross.
+  const c = d2 === n.d ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+    : { x: VX[n.i] + (r1[0] + r2[0]) * LANE, y: HY[n.j] + (r1[1] + r2[1]) * LANE };
+  const len = (Math.hypot(c.x - a.x, c.y - a.y) + Math.hypot(b.x - c.x, b.y - c.y) + Math.hypot(b.x - a.x, b.y - a.y)) / 2;
+  Object.assign(n, { mode: 'turn', p0: a, p1: b, c, d2, s: 0, len, side: 0 });
+}
+function placeNpc(n) {
+  if (n.mode === 'lane') {
+    const [dx, dy] = DIRS[n.d];
+    const [rx, ry] = DIRS[(n.d + 1) % 4];
+    n.x = n.p0.x + dx * n.s + rx * n.side;
+    n.y = n.p0.y + dy * n.s + ry * n.side;
+    n.a = Math.atan2(dy, dx);
+    return;
+  }
+  const u = Math.min(1, n.s / n.len), v = 1 - u;
+  n.x = v * v * n.p0.x + 2 * v * u * n.c.x + u * u * n.p1.x;
+  n.y = v * v * n.p0.y + 2 * v * u * n.c.y + u * u * n.p1.y;
+  n.a = Math.atan2(v * (n.c.y - n.p0.y) + u * (n.p1.y - n.c.y), v * (n.c.x - n.p0.x) + u * (n.p1.x - n.c.x));
+}
+function spawnTraffic() {
+  traffic.length = 0;
+  const lanes = [];
+  for (let i = 0; i < VX.length; i++) for (let j = 0; j < HY.length; j++) for (let d = 0; d < 4; d++) if (hasRoad(i, j, d)) lanes.push([i, j, d]);
+  for (let k = lanes.length - 1; k > 0; k--) {
+    const r = Math.floor(Math.random() * (k + 1));
+    [lanes[k], lanes[r]] = [lanes[r], lanes[k]];
+  }
+  const kinds = ['sedan', 'sedan', 'van', 'sedan', 'truck', 'sedan', 'sedan'];
+  const paints = ['sky', 'citrus', 'white', 'cal', 'gray', 'blue'];
+  for (const [i, j, d] of lanes) {
+    if (traffic.length >= TRAFFIC_N) break;
+    const k = traffic.length;
+    const n = { type: kinds[k % kinds.length], color: paints[k % paints.length], cruise: 150 + Math.random() * 80,
+                v: 0, side: 0, pull: 0, rush: 0, ghost: 0, wait: 0 };
+    setLane(n, i, j, d);
+    n.s = n.len * (0.2 + Math.random() * 0.6);
+    placeNpc(n);
+    if (Math.hypot(n.x - state.car.x, n.y - state.car.y) < 260) continue;
+    n.v = n.cruise;
+    traffic.push(n);
+  }
+}
+function stepTraffic(dt) {
+  const car = state.car;
+  for (const n of traffic) {
+    const hx = Math.cos(n.a), hy = Math.sin(n.a);
+    const ahead = (ox, oy, reach, wide) => {
+      const rx = ox - n.x, ry = oy - n.y;
+      const along = rx * hx + ry * hy;
+      return along > 0 && along < reach && Math.abs(rx * hy - ry * hx) < wide;
+    };
+    let block = '';
+    if (ahead(car.x, car.y, 66 + n.v * 0.4, 30)) block = 'you';
+    else if (n.ghost <= 0) {
+      for (const o of traffic) if (o !== n && ahead(o.x, o.y, 70 + n.v * 0.35, 24)) { block = 'car'; break; }
+    }
+    n.ghost = Math.max(0, n.ghost - dt);
+    n.pull = Math.max(0, n.pull - dt);
+    n.rush = Math.max(0, n.rush - dt);
+    const want = block ? 0 : n.cruise * (n.pull > 0 ? 0.3 : n.rush > 0 ? 1.7 : 1);
+    n.v = Math.max(0, n.v + Math.max(-560 * dt, Math.min(180 * dt, want - n.v)));
+    if (block && n.v < 8) {
+      n.wait += dt;
+      // Two cars facing each other down at a corner: one of them goes.
+      if (block === 'car' && n.wait > 2.5) { n.ghost = 1.6; n.wait = 0; }
+      if (block === 'you' && n.wait > 2.4) { n.wait = 0; npcHonk(n); }
+    } else n.wait = 0;
+    // Pulling over for a horn means drifting to the curb, then back.
+    const room = n.mode === 'lane' && n.len - n.s > 150;
+    const sideWant = n.pull > 0 && room ? 38 : 0;
+    n.side += Math.max(-70 * dt, Math.min(70 * dt, sideWant - n.side));
+    n.s += n.v * dt;
+    if (n.s >= n.len) { if (n.mode === 'lane') setTurn(n); else setLane(n, n.i, n.j, n.d2); }
+    placeNpc(n);
+  }
+}
+function npcHonk(n) {
+  toasts.push({ text: 'Beep!', color: '#FFFFFF', t: 0, x: n.x, y: n.y - 40 });
+  hornSound('sedan', 0.5);
+}
 
 // ------------------------------------------------------------------ driving
 
@@ -1147,15 +1570,61 @@ let shake = 0;
 const toasts = [];
 function say(text, color) { toasts.push({ text, color, t: 0, x: state.car.x, y: state.car.y - 44 }); }
 
+// Things that only exist while the page is open: the car on the tow hook,
+// the nitro tank, tire marks, and the cones.
+let tow = null;
+let nitro = 1;
+let boosting = false;
+let boostLock = false;
+let wheelPrev = null;
+let bumpAt = 0;
+let coneAt = 0;
+const skids = [];
+const cones = CONE_AT.map(([x, y]) => ({ x, y, vx: 0, vy: 0, a: 0, va: 0 }));
+
+function bump(n) {
+  const now = performance.now();
+  if (now - bumpAt < 900) return;
+  bumpAt = now;
+  speed *= 0.45;
+  n.v = 0;
+  shake = Math.max(shake, 0.22);
+  SFX.bump();
+  const w = state.work;
+  if (state.up.bar) say('Bull bar!', '#EDA941');
+  else if (w && w.leg && w.legAt) { w.hits = (w.hits || 0) + 1; say(`-$${HIT_COST} tip`, '#EDA941'); save(); }
+  else say('Watch it!', '#EDA941');
+}
+
+function stepProps(dt) {
+  for (const c of cones) {
+    if (!c.vx && !c.vy) continue;
+    c.x = Math.max(LAND.x0 + 12, Math.min(LAND.x1 - 12, c.x + c.vx * dt));
+    c.y = Math.max(LAND.y0 + 12, Math.min(c.x > PIER.x0 && c.x < PIER.x1 ? PIER.y1 - 12 : LAND.y1 - 12, c.y + c.vy * dt));
+    c.a += c.va * dt;
+    const k = Math.max(0, 1 - 3.2 * dt);
+    c.vx *= k; c.vy *= k; c.va *= k;
+    if (Math.hypot(c.vx, c.vy) < 6) { c.vx = 0; c.vy = 0; c.va = 0; }
+  }
+  for (const s of skids) s.t += dt;
+  while (skids.length && skids[0].t > 8) skids.shift();
+}
+
 function solids() {
   const rects = STATIC.rects.slice();
   const circles = [FOUNTAIN];
+  // A car in traffic is two circles, nose and tail.
+  for (const n of traffic) {
+    const hx = Math.cos(n.a) * 16, hy = Math.sin(n.a) * 16;
+    circles.push({ x: n.x + hx, y: n.y + hy, r: 15, npc: n }, { x: n.x - hx, y: n.y - hy, r: 15, npc: n });
+  }
+  // Signs are painted on the ground and never block the car. As solid boards
+  // they would wall off the row: the gaps between them are one car wide.
   for (const sc of scenes()) {
     for (const s of [...sc.decor, ...sc.spots]) {
       if (s.hidden || s.gone || s.taken) continue;
       if (s.kind === 'house') rects.push({ x: s.x - 56, y: s.y - 44, w: 112, h: 86 });
       else if (s.kind === 'vehicle' || s.kind === 'hcar') circles.push({ x: s.x, y: s.y, r: s.type === 'bus' ? 44 : 34 });
-      else if (s.kind === 'sign') circles.push({ x: s.x, y: s.y + 6, r: 16 });
     }
   }
   return { rects, circles };
@@ -1165,7 +1634,8 @@ function stepCar(dt) {
   const car = state.car;
   let throttle = 0;
   let steer = 0;
-  if (stick.on && Math.hypot(stick.x, stick.y) > 0.16) {
+  const byStick = stick.on && Math.hypot(stick.x, stick.y) > 0.16;
+  if (byStick) {
     // Stick: point where you want to go.
     const want = Math.atan2(stick.y, stick.x);
     let diff = want - car.a;
@@ -1174,24 +1644,44 @@ function stepCar(dt) {
     const mag = Math.min(1, Math.hypot(stick.x, stick.y));
     car.a += Math.sign(diff) * Math.min(Math.abs(diff), 4.6 * dt);
     throttle = mag * (Math.abs(diff) > 2.2 ? 0.45 : 1);
-    speed += throttle * 640 * dt;
   } else {
     throttle = (keys.ArrowUp || keys.w ? 1 : 0) - (keys.ArrowDown || keys.s ? 1 : 0);
     steer = (keys.ArrowRight || keys.d ? 1 : 0) - (keys.ArrowLeft || keys.a ? 1 : 0);
-    if (throttle > 0) speed += (speed < 0 ? 1100 : 640) * dt;
-    else if (throttle < 0) speed -= (speed > 0 ? 1100 : 420) * dt;
-    const grip = Math.max(-1, Math.min(1, speed / 150));
-    car.a += steer * 3.1 * grip * dt;
   }
+  // What the Mod Shop changed: engine, tires, nitro.
+  const up = state.up;
+  const held = !!(keys.Shift || boostDown);
+  const wantBoost = !!up.nitro && held && !boostLock && nitro > 0 && throttle > 0;
+  if (wantBoost && !boosting) SFX.nitro();
+  boosting = wantBoost;
+  if (boosting) {
+    nitro -= dt / 1.6;
+    if (nitro <= 0) { nitro = 0; boostLock = true; }
+  } else {
+    nitro = Math.min(1, nitro + dt / 5);
+    if (!held) boostLock = false;
+  }
+  const pickup = 640 * (1 + 0.12 * (up.engine || 0)) * (boosting ? 2.2 : 1);
+  const brake = 1100 + 250 * (up.tires || 0);
+  const was = speed;
+  if (byStick) speed += throttle * pickup * dt;
+  else if (throttle > 0) speed += (speed < 0 ? brake : pickup) * dt;
+  else if (throttle < 0) speed -= (speed > 0 ? brake : 420) * dt;
+  const grip = Math.max(-1, Math.min(1, speed / 150));
+  car.a += steer * (3.1 + 0.4 * (up.tires || 0)) * grip * dt;
   if (!throttle) speed -= speed * Math.min(1, 2.6 * dt);
-  const top = car.type === 'moto' ? 500 : car.type === 'bus' ? 380 : 440;
-  speed = Math.max(-190, Math.min(top, speed));
+  const top = (car.type === 'moto' ? 500 : car.type === 'bus' ? 380 : 440) * (1 + 0.09 * (up.engine || 0)) * (boosting ? 1.4 : 1);
+  // The engine cannot push past top speed. Coming off nitro, the extra
+  // speed bleeds away instead of vanishing.
+  if (speed > top) speed = Math.max(top, Math.min(speed, was) - 700 * dt);
+  speed = Math.max(-190, speed);
   if (Math.abs(speed) < 4 && !throttle) speed = 0;
 
   let nx = car.x + Math.cos(car.a) * speed * dt;
   let ny = car.y + Math.sin(car.a) * speed * dt;
   const { rects, circles } = solids();
   let hit = false;
+  let hitNpc = null;
   for (let pass = 0; pass < 2; pass++) {
     for (const r of rects) {
       const cx = Math.max(r.x, Math.min(nx, r.x + r.w));
@@ -1215,6 +1705,7 @@ function stepCar(dt) {
       const min = c.r + CAR_R;
       if (d >= min) continue;
       hit = true;
+      if (c.npc) hitNpc = c.npc;
       if (d > 0.001) { nx = c.x + dx / d * min; ny = c.y + dy / d * min; } else ny = c.y + min;
     }
   }
@@ -1230,15 +1721,60 @@ function stepCar(dt) {
     } else { ny = LAND.y1 - m; hit = true; }
   }
   if (hit) speed *= 0.86;
+  if (hitNpc) bump(hitNpc);
   car.x = nx;
   car.y = ny;
 
-  // The last leg of a job: reach the marked place.
-  const job = curJob();
-  if (job && state.work.leg) {
-    const t = PLACES[job.leg.to];
-    if (Math.hypot(car.x - t.x, car.y - t.y) < 58) finishJob();
+  // Tire marks: a fast turn, a hard stop, or nitro.
+  const cos = Math.cos(car.a), sin = Math.sin(car.a);
+  const wheels = [car.x - cos * 20 - sin * 11, car.y - sin * 20 + cos * 11, car.x - cos * 20 + sin * 11, car.y - sin * 20 - cos * 11];
+  if (wheelPrev && (boosting || (steer && Math.abs(speed) > 360) || (throttle < 0 && speed > 220))) {
+    skids.push({ a: wheelPrev, b: wheels, t: 0 });
+    if (skids.length > 260) skids.shift();
   }
+  wheelPrev = wheels;
+
+  // Cones go flying.
+  for (const c of cones) {
+    const dx = c.x - car.x, dy = c.y - car.y;
+    const d = Math.hypot(dx, dy);
+    if (d >= CAR_R + 9 || d < 0.01) continue;
+    const k = Math.max(140, Math.abs(speed) * 1.1);
+    c.vx = dx / d * k + cos * speed * 0.3;
+    c.vy = dy / d * k + sin * speed * 0.3;
+    c.va = (Math.random() - 0.5) * 16;
+    c.x = car.x + dx / d * (CAR_R + 9);
+    c.y = car.y + dy / d * (CAR_R + 9);
+    if (performance.now() - coneAt > 120) { coneAt = performance.now(); SFX.cone(); }
+  }
+
+  // Missing semicolons.
+  for (let i = 0; i < SEMIS.length; i++) {
+    if (state.semi.includes(i) || Math.hypot(car.x - SEMIS[i][0], car.y - SEMIS[i][1]) > 36) continue;
+    state.semi.push(i);
+    SFX.semi();
+    say(state.semi.length === SEMIS.length ? `All ${SEMIS.length} semicolons!` : `; +$${SEMI_PAY}`, '#EDA941');
+    touch();
+  }
+
+  // The delivery at the end of a job: the tip clock starts once the car
+  // pulls out, and reaching the marked place closes the job.
+  const job = curJob();
+  const w = state.work;
+  if (job && w.leg && w.go) {
+    const t = PLACES[w.go.to];
+    if (!w.legAt && !(Math.hypot(car.x - w.legX, car.y - w.legY) <= 90)) { w.legAt = Date.now(); SFX.go(); save(); }
+    if (w.go.tow) {
+      // The towed car trails the hook like a trailer.
+      const hx = car.x - cos * 46, hy = car.y - sin * 46;
+      if (!tow) tow = { x: hx - cos * 38, y: hy - sin * 38, a: car.a };
+      const d = Math.hypot(tow.x - hx, tow.y - hy) || 1;
+      tow.x = hx + (tow.x - hx) / d * 38;
+      tow.y = hy + (tow.y - hy) / d * 38;
+      tow.a = Math.atan2(hy - tow.y, hx - tow.x);
+    }
+    if (Math.hypot(car.x - t.x, car.y - t.y) < 52) finishJob();
+  } else tow = null;
 }
 
 // ------------------------------------------------------------------ drawing
@@ -1365,6 +1901,19 @@ function drawGround() {
   for (let x = Math.floor(gx0 / 44) * 44; x < gx1; x += 44) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
   for (let y = Math.floor(gy0 / 44) * 44; y < gy1; y += 44) { ctx.moveTo(gx0, y); ctx.lineTo(gx1, y); }
   ctx.stroke();
+  // Boats out on the water.
+  for (const b of BOATS) {
+    const th = clockT * b.sp * Math.PI * 2;
+    ctx.save();
+    ctx.translate(b.cx + Math.cos(th) * b.rx, b.cy + Math.sin(th) * b.ry);
+    ctx.rotate(Math.atan2(Math.cos(th) * b.ry * b.sp, -Math.sin(th) * b.rx * b.sp));
+    ctx.strokeStyle = 'rgba(138,204,228,0.3)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-20, -8); ctx.lineTo(-58, -17); ctx.moveTo(-20, 8); ctx.lineTo(-58, 17); ctx.stroke();
+    ctx.fillStyle = '#8ACCE4';
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(8, -11); ctx.lineTo(-22, -10); ctx.lineTo(-22, 10); ctx.lineTo(8, 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#E9EEF3'; rr(-14, -6, 18, 12, 3); ctx.fill();
+    ctx.restore();
+  }
   // Pier, then the land.
   ctx.fillStyle = '#0B2F5E';
   ctx.fillRect(PIER.x0, PIER.y0, PIER.x1 - PIER.x0, PIER.y1 - PIER.y0);
@@ -1396,6 +1945,14 @@ function drawGround() {
   ctx.setLineDash([]);
   ctx.fillStyle = '#03101F';
   for (const x of VX) for (const y of HY) ctx.fillRect(x - RW / 2, y - RW / 2, RW, RW);
+  // Crosswalks on all four sides of each intersection.
+  ctx.fillStyle = 'rgba(238,242,246,0.16)';
+  for (const x of VX) for (const y of HY) for (let k = -52; k <= 44; k += 16) {
+    ctx.fillRect(x - RW / 2 - 24, y + k, 18, 8);
+    ctx.fillRect(x + RW / 2 + 6, y + k, 18, 8);
+    ctx.fillRect(x + k, y - RW / 2 - 24, 8, 18);
+    ctx.fillRect(x + k, y + RW / 2 + 6, 8, 18);
+  }
   // Street names.
   VX.forEach((x, i) => {
     for (const y of [760, 1480]) {
@@ -1410,6 +1967,56 @@ function drawGround() {
   // The road to the pier.
   ctx.fillStyle = '#03101F';
   ctx.fillRect(1600 - 50, HY[2] + RW / 2, 100, LAND.y1 - HY[2] - RW / 2);
+  // Tire marks fade over a few seconds.
+  ctx.lineWidth = 5; ctx.lineCap = 'butt';
+  for (const s of skids) {
+    ctx.strokeStyle = `rgba(0,0,0,${(0.34 * (1 - s.t / 8)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(s.a[0], s.a[1]); ctx.lineTo(s.b[0], s.b[1]);
+    ctx.moveTo(s.a[2], s.a[3]); ctx.lineTo(s.b[2], s.b[3]);
+    ctx.stroke();
+  }
+}
+
+// A place a job can send you: the apron you pull onto, then the building.
+function drawPlace(r) {
+  const p = PLACES[r.id];
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const flat = Math.abs(p.y - cy) > Math.abs(p.x - cx);
+  ctx.fillStyle = '#0B2F5E';
+  rr(p.x - (flat ? 84 : 32), p.y - (flat ? 32 : 84), flat ? 168 : 64, flat ? 64 : 168, 12); ctx.fill();
+  ctx.strokeStyle = 'rgba(138,204,228,0.3)'; ctx.lineWidth = 2; ctx.setLineDash([8, 7]); ctx.stroke(); ctx.setLineDash([]);
+  if (r.id === 'light') {
+    // The lamp turns.
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(clockT * 0.9);
+    const beam = ctx.createLinearGradient(0, 0, 280, 0);
+    beam.addColorStop(0, 'rgba(243,205,71,0.5)'); beam.addColorStop(1, 'rgba(243,205,71,0)');
+    ctx.fillStyle = beam; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(280, -76); ctx.lineTo(280, 76); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(cx + 6, cy + 8, 46, 0, 7); ctx.fill();
+    ctx.fillStyle = '#E9EEF3'; ctx.beginPath(); ctx.arc(cx, cy, 46, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#FF7900'; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(cx, cy, 31, 0, 7); ctx.stroke();
+    ctx.fillStyle = '#F3CD47'; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 7); ctx.fill();
+    text(r.name, cx, r.y + r.h + 24, { size: 16, plate: '#03101F', fixed: true });
+    return;
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; rr(r.x + 6, r.y + 8, r.w, r.h, 8); ctx.fill();
+  ctx.fillStyle = r.id === 'scrap' ? '#03101F' : '#0F3F8C'; rr(r.x, r.y, r.w, r.h, 8); ctx.fill();
+  ctx.strokeStyle = r.id === 'scrap' ? '#EDA941' : 'rgba(138,204,228,0.42)'; ctx.lineWidth = r.id === 'scrap' ? 3 : 2; ctx.stroke();
+  if (r.id === 'scrap') {
+    // What is left of the cars that got a delete.
+    [['sky', 26, 34, 0.5], ['gray', 64, 58, -0.4], ['citrus', 30, 150, 1.3], ['gray', 66, 128, 0.2]].forEach(([c, dx, dy, a]) => {
+      ctx.save(); ctx.translate(r.x + dx, r.y + dy); ctx.rotate(a);
+      ctx.globalAlpha = 0.75; ctx.fillStyle = PAINT[c]; rr(-17, -9, 34, 18, 5); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+  } else {
+    ctx.fillStyle = '#FF7900'; ctx.fillRect(r.x + 10, r.y + r.h - 12, r.w - 20, 5);
+  }
+  ctx.save(); ctx.translate(cx, cy - (r.h > r.w ? 0 : 5));
+  if (r.h > r.w) ctx.rotate(-Math.PI / 2);
+  text(r.name.toUpperCase(), 0, 0, { size: 19, fixed: true, plate: r.id === 'scrap' ? '#03101F' : null });
+  ctx.restore();
 }
 
 function drawStatic() {
@@ -1428,6 +2035,15 @@ function drawStatic() {
       ctx.strokeStyle = 'rgba(138,204,228,0.42)'; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = '#FF7900'; ctx.fillRect(r.x + 10, r.y + r.h - 12, r.w - 20, 5);
       text(r.kind === 'garage' ? 'THE GARAGE' : 'BODY SHOP', r.x + r.w / 2, r.y + r.h / 2 - 6, { size: 26, fixed: true });
+    } else if (r.kind === 'place') {
+      drawPlace(r);
+    } else if (r.kind === 'mod') {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; rr(r.x + 6, r.y + 8, r.w, r.h, 8); ctx.fill();
+      ctx.fillStyle = '#0F3F8C'; rr(r.x, r.y, r.w, r.h, 8); ctx.fill();
+      ctx.strokeStyle = '#EDA941'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#EDA941'; ctx.fillRect(r.x + 10, r.y + r.h - 12, r.w - 20, 5);
+      text('MOD SHOP', r.x + r.w / 2, r.y + r.h / 2 - 14, { size: 21, fixed: true });
+      text('upgrades', r.x + r.w / 2, r.y + r.h / 2 + 10, { size: 14, bold: false, fixed: true, color: '#EDA941' });
     } else if (r.kind === 'fence') {
       ctx.fillStyle = 'rgba(138,204,228,0.6)'; ctx.fillRect(r.x, r.y, r.w, r.h);
       text('HEAP IMPOUND', r.x + r.w / 2, r.y - 4, { size: 20, fixed: true, color: 'rgba(238,242,246,0.75)', base: 'bottom' });
@@ -1469,7 +2085,6 @@ function drawSign(s, dim) {
   const lines = s.text.split('\n');
   const longest = Math.max(...lines.map((l) => l.length));
   const w = 150, h = 74;
-  ctx.fillStyle = '#5E6B7A'; ctx.fillRect(s.x - 4, s.y + 20, 8, 30);
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; rr(s.x - w / 2 + 5, s.y - h / 2 + 6, w, h, 9); ctx.fill();
   ctx.fillStyle = dim ? '#061B38' : '#00244E'; rr(s.x - w / 2, s.y - h / 2, w, h, 9); ctx.fill();
   ctx.strokeStyle = dim ? 'rgba(138,204,228,0.25)' : '#8ACCE4'; ctx.lineWidth = 3; ctx.stroke();
@@ -1593,18 +2208,71 @@ function drawBoards() {
     text(m.name, b.x, b.y - 8, { size: 15, fixed: true, color: done ? '#A6DB86' : '#FFFFFF' });
     text(done ? 'all done' : mine ? 'in progress' : `${n}/${jobs.length} jobs`, b.x, b.y + 12, { size: 12.5, bold: false, fixed: true, color: 'rgba(238,242,246,0.8)' });
   }
-  if (job && state.work.leg) {
-    const t = PLACES[job.leg.to];
-    ring(t.x, t.y, 52, '#FF7900', true);
-    text(t.label, t.x, t.y - 70, { size: 15, plate: '#03101F', fixed: true });
+  // The Mod Shop's ring is citrus, so it never reads as a mission.
+  const atShop = focus && focus.kind === 'shop';
+  ring(MOD.x, MOD.y, 44, '#EDA941', atShop);
+  text('Mod Shop', MOD.x, MOD.y - 8, { size: 15, fixed: true });
+  text('upgrades', MOD.x, MOD.y + 12, { size: 12.5, bold: false, fixed: true, color: 'rgba(238,242,246,0.8)' });
+  if (job && state.work.leg && state.work.go) {
+    const t = PLACES[state.work.go.to];
+    ring(t.x, t.y, 46, '#FF7900', true);
+    text(t.label, t.x, t.y - 64, { size: 15, plate: '#03101F', fixed: true });
   }
+}
+
+// Semicolons, cones, traffic, and whatever is on the tow hook.
+function drawStreet() {
+  ctx.font = "700 30px 'Atkinson Hyperlegible Mono', Consolas, monospace";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  SEMIS.forEach(([x, y], i) => {
+    if (state.semi.includes(i)) return;
+    const bob = Math.sin(clockT * 3 + i) * 4;
+    ctx.fillStyle = 'rgba(237,169,65,0.18)'; ctx.beginPath(); ctx.arc(x, y, 24 + bob * 0.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#03101F'; ctx.beginPath(); ctx.arc(x, y + bob, 16, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#EDA941'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#EDA941'; ctx.fillText(';', x, y + bob - 3);
+  });
+  for (const c of cones) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; rr(-8, -6, 20, 20, 3); ctx.fill();
+    ctx.fillStyle = '#DF6436'; rr(-10, -10, 20, 20, 3); ctx.fill();
+    ctx.fillStyle = '#E9EEF3'; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#FF7900'; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+  for (const n of traffic) drawVehicle(n.type, n.color, n.x, n.y, n.a, 1);
+  if (tow && state.work && state.work.go) {
+    ctx.strokeStyle = '#EDA941'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(state.car.x - Math.cos(state.car.a) * 44, state.car.y - Math.sin(state.car.a) * 44);
+    ctx.lineTo(tow.x + Math.cos(tow.a) * 26, tow.y + Math.sin(tow.a) * 26); ctx.stroke();
+    drawVehicle('sedan', state.work.go.tow, tow.x, tow.y, tow.a, 1);
+  }
+}
+
+// Your car, with whatever the Mod Shop bolted on.
+function drawPlayer() {
+  const car = state.car;
+  if (state.up.glow) {
+    const g = ctx.createRadialGradient(car.x, car.y, 8, car.x, car.y, 62);
+    g.addColorStop(0, 'rgba(255,121,0,0.55)'); g.addColorStop(1, 'rgba(255,121,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(car.x, car.y, 62, 0, 7); ctx.fill();
+  }
+  if (boosting) {
+    ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.a);
+    const back = car.type === 'bus' ? -54 : car.type === 'moto' ? -25 : car.type === 'sedan' ? -32 : -40;
+    const len = 26 + Math.random() * 22;
+    ctx.fillStyle = '#FF7900'; ctx.beginPath(); ctx.moveTo(back, -9); ctx.lineTo(back - len, 0); ctx.lineTo(back, 9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#F3CD47'; ctx.beginPath(); ctx.moveTo(back, -5); ctx.lineTo(back - len * 0.55, 0); ctx.lineTo(back, 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  drawVehicle(car.type, car.color, car.x, car.y, car.a, 1);
 }
 
 // Where the pair should be heading, if anywhere.
 function target() {
   const job = curJob();
   if (!job || state.work.done) return null;
-  if (state.work.leg) return PLACES[job.leg.to];
+  if (state.work.leg && state.work.go) return PLACES[state.work.go.to];
   const b = blockOf(missionOf(job));
   return { x: (b.x0 + b.x1) / 2, y: b.y0 + 300, label: missionOf(job).name };
 }
@@ -1642,10 +2310,50 @@ function drawHud() {
     ctx.fillStyle = done ? '#A6DB86' : '#FF7900';
     ctx.beginPath(); ctx.arc(mx + b.x * k, my + (b.y - 240) * k, vw < 520 ? 3.5 : 5, 0, 7); ctx.fill();
   }
+  ctx.fillStyle = '#EDA941';
+  ctx.fillRect(mx + MOD.x * k - 3, my + MOD.y * k - 3, 6, 6);
+  if (state.up.radar) {
+    SEMIS.forEach(([x, y], i) => { if (!state.semi.includes(i)) ctx.fillRect(mx + x * k - 1.5, my + y * k - 1.5, 3, 3); });
+  }
   if (t) { ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx + t.x * k, my + t.y * k, 7, 0, 7); ctx.stroke(); }
   ctx.save(); ctx.translate(mx + state.car.x * k, my + state.car.y * k); ctx.rotate(state.car.a);
   ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill();
   ctx.restore();
+
+  // The delivery: where to, and what the tip is worth right now.
+  const job = curJob();
+  const w = state.work;
+  let hudY = 10;
+  const cw = Math.max(170, Math.min(290, vw - mw - 34));
+  if (job && w.leg && w.go) {
+    const tip = tipNow(w);
+    ctx.fillStyle = 'rgba(3,16,31,0.9)'; rr(10, hudY, cw, 62, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(138,204,228,0.42)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = "700 11px 'Atkinson Hyperlegible', system-ui, sans-serif";
+    ctx.fillStyle = '#FF7900'; ctx.fillText('DRIVE TO', 22, hudY + 19);
+    ctx.font = "700 16px 'Atkinson Hyperlegible', system-ui, sans-serif";
+    ctx.fillStyle = '#EEF2F6'; ctx.fillText(PLACES[w.go.to].label, 84, hudY + 19, cw - 96);
+    ctx.font = "700 15px 'Atkinson Hyperlegible Mono', Consolas, monospace";
+    ctx.fillStyle = '#EDA941'; ctx.fillText(`Tip $${tip}`, 22, hudY + 43);
+    if (w.legAt) {
+      ctx.fillStyle = 'rgba(138,204,228,0.2)'; rr(108, hudY + 38, cw - 122, 9, 4); ctx.fill();
+      if (tip > 0) { ctx.fillStyle = '#EDA941'; rr(108, hudY + 38, (cw - 122) * tip / TIP, 9, 4); ctx.fill(); }
+    } else {
+      ctx.font = "400 12.5px 'Atkinson Hyperlegible', system-ui, sans-serif";
+      ctx.fillStyle = '#A9BFC6'; ctx.fillText('clock starts when you pull out', 108, hudY + 43, cw - 118);
+    }
+    hudY += 70;
+  }
+  if (state.up.nitro) {
+    ctx.fillStyle = 'rgba(3,16,31,0.9)'; rr(10, hudY, 150, 26, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(138,204,228,0.42)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = "700 11px 'Atkinson Hyperlegible', system-ui, sans-serif";
+    ctx.fillStyle = boostLock ? '#A9BFC6' : '#EDA941'; ctx.fillText('NITRO', 20, hudY + 14);
+    ctx.fillStyle = 'rgba(138,204,228,0.2)'; rr(66, hudY + 9, 84, 8, 4); ctx.fill();
+    if (nitro > 0.02) { ctx.fillStyle = boostLock ? '#A9BFC6' : '#EDA941'; rr(66, hudY + 9, 84 * nitro, 8, 4); ctx.fill(); }
+  }
 
   // What Space does here.
   if (focus) {
@@ -1691,7 +2399,8 @@ function draw() {
   drawStatic();
   drawBoards();
   drawScenes();
-  drawVehicle(car.type, car.color, car.x, car.y, car.a, 1);
+  drawStreet();
+  drawPlayer();
   drawTrees();
   for (const t of toasts) {
     ctx.globalAlpha = Math.max(0, 1 - t.t / 1.3);
@@ -1710,7 +2419,9 @@ function frame(now) {
   last = now;
   clockT += dt;
   shake = Math.max(0, shake - dt);
-  if (Date.now() >= state.restUntil) stepCar(dt);
+  if (Date.now() >= state.restUntil && $('shop').hidden) stepCar(dt);
+  stepTraffic(dt);
+  stepProps(dt);
   for (const t of toasts) t.t += dt;
   while (toasts.length && toasts[0].t > 1.3) toasts.shift();
   const f = findFocus();
@@ -1750,6 +2461,13 @@ function startGame() {
   cam.x = state.car.x;
   cam.y = state.car.y;
   speed = 0;
+  nitro = 1;
+  tow = null;
+  wheelPrev = null;
+  skids.length = 0;
+  cones.forEach((c, i) => Object.assign(c, { x: CONE_AT[i][0], y: CONE_AT[i][1], vx: 0, vy: 0, a: 0, va: 0 }));
+  spawnTraffic();
+  audio();
   renderBar();
   renderPanel();
 }
@@ -1774,6 +2492,11 @@ $('join-form').addEventListener('submit', (ev) => {
 
 $('resume-go').addEventListener('click', () => {
   state = store.get(KEY);
+  // A save from before the Mod Shop existed has none of these.
+  state.up = state.up || {};
+  state.spent = state.spent || 0;
+  state.semi = state.semi || [];
+  if (state.work && state.work.leg && !state.work.go) { state.cur = null; state.work = null; }
   catchUp();
   report('resume');
   startGame();
@@ -1796,8 +2519,10 @@ setInterval(() => {
 
 window.SEG_TEST = {
   LEVELS, MISSIONS, optKey, unseal, debriefKey, scenes, boardOf, PLACES,
-  state: () => state, choose, act, startMission, nextJob, findFocus,
-  tp(x, y) { state.car.x = x; state.car.y = y; speed = 0; cam.x = x; cam.y = y; },
+  state: () => state, choose, act, startMission, nextJob, findFocus, honk, buy, openShop, closeShop,
+  tipNow, tipCap, legPar, wallet, totalCash, traffic, cones, skids, STATIC, SEMIS, MOD, UPGRADES, snd, keys, solids,
+  speed: () => speed, nitro: () => nitro,
+  tp(x, y) { state.car.x = x; state.car.y = y; speed = 0; cam.x = x; cam.y = y; wheelPrev = null; },
 };
 requestAnimationFrame(frame);
 renderStart();
