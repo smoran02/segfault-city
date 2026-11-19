@@ -139,14 +139,14 @@ h1, h2, h3 { line-height: 1.15; margin: 0; }
 .foot { margin-top: 3em; color: var(--muted); font-size: 0.85rem; }
 
 /* ---------- top bar ---------- */
-#v-game { height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+#v-game { height: 100vh; height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
 .topbar {
   display: flex; align-items: center; gap: 12px; padding: 10px 16px;
   background: rgba(6, 21, 40, 0.92);
   border-bottom: 1px solid var(--line);
 }
 .topbar .brand { font-weight: 700; letter-spacing: 0.12em; font-size: 0.78rem; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.topbar .team { margin-left: auto; font-weight: 700; max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .team { margin-left: auto; font-weight: 700; max-width: 30vw; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clock {
   font-family: var(--mono); font-weight: 700; font-size: 1.05rem;
   background: var(--code-bg); border: 1px solid var(--line-strong);
@@ -157,6 +157,12 @@ h1, h2, h3 { line-height: 1.15; margin: 0; }
 .clock.warn i { width: 13px; height: 12px; display: block; clip-path: polygon(50% 0, 100% 100%, 0 100%); background: rgba(138, 204, 228, 0.22); }
 .clock.warn i.hot { background: var(--citrus); }
 .sndbtn { display: inline-flex; align-items: center; color: var(--text); padding: 0.32em 0.5em; }
+.unstuck { color: var(--text); font-family: inherit; font-size: 0.86rem; cursor: pointer; padding: 0.32em 0.6em; }
+.unstuck:hover { border-color: var(--citrus); }
+@media (max-width: 480px) {
+  header.topbar { gap: 6px; }
+  .unstuck { font-size: 0.76rem; padding: 0.32em 0.4em; }
+}
 .sndbtn svg { width: 20px; height: 18px; display: block; }
 .sndbtn .cut { display: none; }
 .sndbtn.off { color: var(--muted); }
@@ -321,7 +327,7 @@ pre.out {
 .mods .btn { grid-row: 1 / span 2; grid-column: 2; min-width: 5.4em; font-family: var(--mono); }
 
 @media (max-width: 900px) {
-  .stage { grid-template-columns: 1fr; grid-template-rows: minmax(0, 45%) minmax(0, 1fr); }
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 45%) minmax(0, 1fr); }
   .panel { padding: 0 12px 16px; font-size: 15.5px; border-bottom: 1px solid var(--line); }
   .dock { margin-bottom: -16px; padding: 8px 0 10px; }
   .dock .note { max-height: 6.2em; overflow-y: auto; }
@@ -409,6 +415,7 @@ pre.out {
     <span class="brand">Segfault City</span>
     <span class="team" id="bar-team"></span>
     <button class="clock sndbtn" id="snd" type="button" aria-pressed="true" aria-label="Sound" title="Sound (M)"><svg viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7h3l4-4v12l-4-4H2z" fill="currentColor"/><path class="wave" d="M12.5 6a4 4 0 0 1 0 6M15 3.5a7.5 7.5 0 0 1 0 11"/><path class="cut" d="M13 6l5 6M18 6l-5 6"/></svg></button>
+    <button class="clock unstuck" id="unstuck" type="button" title="Car stuck? This puts it back at the start point by the fountain.">Unstuck</button>
     <span class="clock warn" id="warns" title="Warnings on this job" aria-label="Warnings on this job"></span>
     <span class="clock cash" id="bar-cash" aria-label="Cash to spend">$0</span>
     <span class="clock" id="clock" aria-label="Your time">0:00</span>
@@ -1402,6 +1409,24 @@ function setSound(on) {
 }
 $('snd').addEventListener('click', () => { setSound(!snd.on); $('snd').blur(); });
 $('snd').classList.toggle('off', !snd.on);
+
+// A way out for a car wedged somewhere it cannot drive out of: back to the
+// start point. On a delivery it costs the same as a bump, so it is never a
+// shortcut to a place near the fountain.
+function unstick() {
+  if (!state || !$('shop').hidden) return;
+  Object.assign(state.car, { x: SPAWN.x, y: SPAWN.y, a: -Math.PI / 2 });
+  speed = 0;
+  wheelPrev = null;
+  tow = null;
+  cam.x = SPAWN.x;
+  cam.y = SPAWN.y;
+  const w = state.work;
+  if (w && w.leg) { w.hits = (w.hits || 0) + 1; say(`Back at the fountain, -$${HIT_COST} tip`, '#EDA941'); }
+  else say('Back at the fountain', '#EDA941');
+  save();
+}
+$('unstuck').addEventListener('click', () => { unstick(); $('unstuck').blur(); });
 $('snd').setAttribute('aria-pressed', String(snd.on));
 
 // ------------------------------------------------------------------ the Mod Shop
@@ -2521,7 +2546,7 @@ setInterval(() => {
 window.SEG_TEST = {
   LEVELS, MISSIONS, optKey, unseal, debriefKey, scenes, boardOf, PLACES,
   state: () => state, choose, act, startMission, nextJob, findFocus, honk, buy, openShop, closeShop,
-  tipNow, tipCap, legPar, wallet, totalCash, traffic, cones, skids, STATIC, SEMIS, MOD, UPGRADES, snd, keys, solids,
+  tipNow, tipCap, legPar, unstick, SPAWN, wallet, totalCash, traffic, cones, skids, STATIC, SEMIS, MOD, UPGRADES, snd, keys, solids,
   speed: () => speed, nitro: () => nitro,
   tp(x, y) { state.car.x = x; state.car.y = y; speed = 0; cam.x = x; cam.y = y; wheelPrev = null; },
 };
